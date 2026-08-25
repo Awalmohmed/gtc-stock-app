@@ -1,0 +1,100 @@
+{% extends 'layouts/gtc-base.html' %}
+
+{% block title %}GTC Stock - Fiches de stock{% endblock title %}
+{% block page_title %}Fiches de stock{% endblock page_title %}
+
+{% block content %}
+
+<div class="row g-3">
+  <!-- Liste des articles -->
+  <div class="col-md-4">
+    <div class="card table-card p-3">
+      <div class="input-group mb-3">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" placeholder="Rechercher un article...">
+      </div>
+      <div class="list-group list-group-flush">
+        {% for a in articles %}
+        <a href="{{ url_for('pages_fiche_stock', article=a.id) }}"
+           class="list-group-item list-group-item-action d-flex justify-content-between {% if a.id == article.id %}active{% endif %}">
+          {{ a.nom }} <span class="badge badge-{{ a.statut_classe }}">{{ a.statut }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Détail de la fiche -->
+  <div class="col-md-8">
+    <div class="card table-card p-4">
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+          <h5 class="mb-0">{{ article.nom }}</h5>
+          <span class="text-muted small">Référence : {{ article.reference }}</span>
+        </div>
+        <span class="badge badge-{{ article.statut_classe }} fs-6">
+          {% if article.statut_classe == 'alerte' %}Alerte — stock sous le seuil
+          {% elif article.statut_classe == 'dormant' %}Dormant — peu de mouvement
+          {% else %}OK — stock conforme{% endif %}
+        </span>
+      </div>
+
+      <div class="row text-center g-2 mb-4">
+        <div class="col-4">
+          <div class="border rounded-3 p-2">
+            <div class="text-muted small">Quantité actuelle</div>
+            <div class="fs-4 fw-bold">{{ article.quantite }}</div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div class="border rounded-3 p-2">
+            <div class="text-muted small">Seuil d'alerte</div>
+            <div class="fs-4 fw-bold">{{ article.seuil }}</div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div class="border rounded-3 p-2">
+            <div class="text-muted small">Dernier mouvement</div>
+            <div class="fs-6 fw-bold pt-1">{{ article.dernier_mouvement }}</div>
+          </div>
+        </div>
+      </div>
+
+      <h6 class="mb-2">Historique des mouvements</h6>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead class="text-muted small">
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Référence</th>
+              <th>Quantité</th>
+              <th>Solde après mouvement</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in historique %}
+            <tr>
+              <td>{{ h.date }}</td>
+              <td>
+                {% if h.type == 'Entrée' %}
+                <span class="badge bg-success-subtle text-success">Entrée</span>
+                {% else %}
+                <span class="badge bg-danger-subtle text-danger">Sortie</span>
+                {% endif %}
+              </td>
+              <td>{{ h.reference }}</td>
+              <td>{{ h.quantite }}</td>
+              <td>{{ h.solde }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-muted text-center">Aucun mouvement enregistré récemment.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}

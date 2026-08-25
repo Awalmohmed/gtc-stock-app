@@ -1,0 +1,25 @@
+<!--
+  GTC Stock — Layout pages d'authentification (écran fractionné navy)
+  Design porté depuis la maquette statique gtc_stock_pro/.
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}GTC Stock{% endblock title %}</title>
+
+  <link href="{{ url_for('static', filename='vendor/bootstrap/dist/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/gtc-stock.css') }}">
+  {% block extrastyle %}{% endblock extrastyle %}
+</head>
+<body class="auth-body">
+
+{% block content %}{% endblock content %}
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/dist/js/bootstrap.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/gtc-stock.js') }}"></script>
+{% block extra_js %}{% endblock extra_js %}
+</body>
+</html>

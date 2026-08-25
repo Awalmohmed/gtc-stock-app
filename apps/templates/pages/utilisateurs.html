@@ -1,0 +1,55 @@
+{% extends 'layouts/gtc-base.html' %}
+
+{% block title %}GTC Stock - Utilisateurs{% endblock title %}
+{% block page_title %}Gestion des utilisateurs{% endblock page_title %}
+{% block user_role %}Administrateur{% endblock user_role %}
+
+{% block content %}
+
+<div class="card table-card p-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="mb-0">Comptes utilisateurs</h6>
+    <a href="{{ url_for('accounts_sign_up') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Ajouter un utilisateur</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead class="text-muted small">
+        <tr>
+          <th>Nom</th>
+          <th>Identifiant</th>
+          <th>Rôle</th>
+          <th>Statut</th>
+          <th>Dernière connexion</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in utilisateurs %}
+        <tr class="{% if u.statut == 'Désactivé' %}table-light{% endif %}">
+          <td>{{ u.nom }}</td>
+          <td>{{ u.identifiant }}</td>
+          <td><span class="badge bg-{{ u.role_classe }}-subtle text-{{ u.role_classe }}">{{ u.role }}</span></td>
+          <td>
+            {% if u.statut == 'Actif' %}
+            <span class="badge bg-success-subtle text-success">Actif</span>
+            {% else %}
+            <span class="badge bg-secondary-subtle text-secondary">Désactivé</span>
+            {% endif %}
+          </td>
+          <td>{{ u.derniere_connexion }}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></button>
+            {% if u.statut == 'Actif' %}
+            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-slash-circle"></i></button>
+            {% else %}
+            <button class="btn btn-sm btn-outline-success"><i class="bi bi-check-circle"></i></button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock content %}

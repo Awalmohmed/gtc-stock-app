@@ -1,0 +1,59 @@
+{% extends 'layouts/gtc-base.html' %}
+
+{% block title %}GTC Stock - Rapprochement{% endblock title %}
+{% block page_title %}Rapprochement comptable{% endblock page_title %}
+{% block user_role %}Comptable{% endblock user_role %}
+
+{% block content %}
+
+<div class="card table-card p-3 mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h6 class="mb-1"><i class="bi bi-diagram-3 text-primary"></i> Connexion Sage 100</h6>
+      <span class="text-muted small">Lecture seule — dernière synchronisation : 24/08/2026 à 07:12</span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-success-subtle text-success"><i class="bi bi-plug-fill"></i> Connecté</span>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-arrow-repeat"></i> Lancer un rapprochement</button>
+    </div>
+  </div>
+</div>
+
+<div class="card table-card p-3">
+  <h6 class="mb-3">Résultat du dernier rapprochement</h6>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead class="text-muted small">
+        <tr>
+          <th>Article</th>
+          <th>Quantité application</th>
+          <th>Quantité Sage 100</th>
+          <th>Écart</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rapprochement %}
+        <tr class="{% if not r.conforme %}table-danger{% endif %}">
+          <td>{{ r.article }}</td>
+          <td>{{ r.qte_app }}</td>
+          <td>{{ r.qte_sage }}</td>
+          <td>{{ r.ecart }}</td>
+          <td>
+            {% if r.conforme %}
+            <span class="badge bg-success-subtle text-success">Conforme</span>
+            {% else %}
+            <span class="badge bg-danger-subtle text-danger">Écart détecté</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-muted small mb-0 mt-2">
+    <i class="bi bi-info-circle"></i> Les lignes en rouge ont automatiquement généré une alerte, consultable dans l'onglet « Alertes ».
+  </p>
+</div>
+
+{% endblock content %}

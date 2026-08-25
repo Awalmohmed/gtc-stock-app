@@ -1,0 +1,96 @@
+{% extends 'layouts/gtc-base.html' %}
+
+{% block title %}GTC Stock - Tableau de bord{% endblock title %}
+{% block page_title %}Tableau de bord{% endblock page_title %}
+
+{% block content %}
+
+<!-- Cartes statistiques -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card card-stat p-3">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="text-muted small">Articles suivis</div>
+          <div class="fs-4 fw-bold">{{ stats.total_articles }}</div>
+        </div>
+        <div class="icon-box" style="background:#eaf0ff;color:#3b5bdb;"><i class="bi bi-box"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-stat p-3">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="text-muted small">En alerte</div>
+          <div class="fs-4 fw-bold text-danger">{{ stats.alertes }}</div>
+        </div>
+        <div class="icon-box" style="background:#fde8e8;color:#c0392b;"><i class="bi bi-exclamation-triangle"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-stat p-3">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="text-muted small">Articles dormants</div>
+          <div class="fs-4 fw-bold text-warning">{{ stats.dormants }}</div>
+        </div>
+        <div class="icon-box" style="background:#fff4e0;color:#b5790a;"><i class="bi bi-hourglass-split"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-stat p-3">
+      <div class="d-flex justify-content-between">
+        <div>
+          <div class="text-muted small">Écarts détectés</div>
+          <div class="fs-4 fw-bold text-danger">{{ stats.ecarts }}</div>
+        </div>
+        <div class="icon-box" style="background:#fde8e8;color:#c0392b;"><i class="bi bi-shield-exclamation"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card table-card p-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="mb-0">Fiche de stock — Aperçu des articles</h6>
+    <a href="{{ url_for('pages_fiche_stock') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Nouvel article</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead class="text-muted small">
+        <tr>
+          <th>Article</th>
+          <th>Référence</th>
+          <th>Quantité</th>
+          <th>Seuil</th>
+          <th>Statut</th>
+          <th>Rapprochement Sage 100</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in articles %}
+        <tr>
+          <td><a href="{{ url_for('pages_fiche_stock', article=a.id) }}" class="text-decoration-none text-dark">{{ a.nom }}</a></td>
+          <td>{{ a.reference }}</td>
+          <td>{{ a.quantite }}</td>
+          <td>{{ a.seuil }}</td>
+          <td><span class="badge badge-{{ a.statut_classe }}">{{ a.statut }}</span></td>
+          <td>
+            {% if a.ecart %}
+            <span class="badge bg-danger-subtle text-danger">Écart : {{ a.ecart }}</span>
+            {% else %}
+            <span class="badge bg-success-subtle text-success">Conforme</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock content %}

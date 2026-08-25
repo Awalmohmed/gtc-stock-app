@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline'; font-src https://cdnjs.cloudflare.com; script-src 'self';">
+<title>GTC Stock - Rapprochement</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="d-flex">
+
+  <div class="sidebar p-3" style="width:230px;">
+    <div class="brand"><i class="bi bi-box-seam"></i> GTC Stock</div>
+    <nav class="nav flex-column mt-3">
+      <a class="nav-link" href="index.html"><i class="bi bi-grid-1x2 me-2"></i> Tableau de bord</a>
+      <a class="nav-link" href="entrees_sorties.html"><i class="bi bi-arrow-down-up me-2"></i> Entrées / Sorties</a>
+      <a class="nav-link" href="fiche_stock.html"><i class="bi bi-card-list me-2"></i> Fiches de stock</a>
+      <a class="nav-link active" href="rapprochement.html"><i class="bi bi-check2-circle me-2"></i> Rapprochement</a>
+      <a class="nav-link" href="alertes.html"><i class="bi bi-bell me-2"></i> Alertes</a>
+      <a class="nav-link" href="utilisateurs.html"><i class="bi bi-people me-2"></i> Utilisateurs</a>
+    </nav>
+  </div>
+
+  <div class="flex-grow-1">
+    <div class="topbar d-flex justify-content-between align-items-center px-4 py-3">
+      <h5 class="mb-0">Rapprochement comptable</h5>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small">Comptable</span>
+        <div class="bg-secondary rounded-circle" style="width:36px;height:36px;"></div>
+        <a href="connexion.html" class="btn btn-sm btn-outline-secondary ms-2"><i class="bi bi-box-arrow-right"></i> Déconnexion</a>
+      </div>
+    </div>
+
+    <div class="p-4">
+      <div class="card table-card p-3 mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h6 class="mb-1"><i class="bi bi-diagram-3 text-primary"></i> Connexion Sage 100</h6>
+            <span class="text-muted small">Lecture seule — dernière synchronisation : 24/08/2026 à 07:12</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-success-subtle text-success"><i class="bi bi-plug-fill"></i> Connecté</span>
+            <button class="btn btn-primary btn-sm"><i class="bi bi-arrow-repeat"></i> Lancer un rapprochement</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card table-card p-3">
+        <h6 class="mb-3">Résultat du dernier rapprochement</h6>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="text-muted small">
+              <tr>
+                <th>Article</th>
+                <th>Quantité application</th>
+                <th>Quantité Sage 100</th>
+                <th>Écart</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Rame de papier A4</td>
+                <td>5</td>
+                <td>5</td>
+                <td>0</td>
+                <td><span class="badge bg-success-subtle text-success">Conforme</span></td>
+              </tr>
+              <tr class="table-danger">
+                <td>Classeur A4</td>
+                <td>8</td>
+                <td>11</td>
+                <td>-3</td>
+                <td><span class="badge bg-danger-subtle text-danger">Écart détecté</span></td>
+              </tr>
+              <tr>
+                <td>Cartouche imprimante</td>
+                <td>50</td>
+                <td>50</td>
+                <td>0</td>
+                <td><span class="badge bg-success-subtle text-success">Conforme</span></td>
+              </tr>
+              <tr class="table-danger">
+                <td>Stylo bille bleu (boîte)</td>
+                <td>96</td>
+                <td>90</td>
+                <td>+6</td>
+                <td><span class="badge bg-danger-subtle text-danger">Écart détecté</span></td>
+              </tr>
+              <tr>
+                <td>Chaise bureau (modèle X)</td>
+                <td>14</td>
+                <td>14</td>
+                <td>0</td>
+                <td><span class="badge bg-success-subtle text-success">Conforme</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-muted small mb-0 mt-2">
+          <i class="bi bi-info-circle"></i> Les lignes en rouge ont automatiquement généré une alerte, consultable dans l'onglet « Alertes ».
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+</body>
+</html>

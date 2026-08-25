@@ -1,0 +1,49 @@
+{% extends 'layouts/gtc-base.html' %}
+
+{% block title %}GTC Stock - Alertes{% endblock title %}
+{% block page_title %}Alertes{% endblock page_title %}
+
+{% block content %}
+
+{% set total = alertes|length %}
+{% set ecarts = alertes|selectattr('type', 'equalto', 'ecart')|list|length %}
+{% set seuils = alertes|selectattr('type', 'equalto', 'seuil')|list|length %}
+
+<ul class="nav nav-pills mb-3">
+  <li class="nav-item"><a class="nav-link active" href="#">Toutes ({{ total }})</a></li>
+  <li class="nav-item"><a class="nav-link" href="#">Écarts de rapprochement ({{ ecarts }})</a></li>
+  <li class="nav-item"><a class="nav-link" href="#">Seuils critiques ({{ seuils }})</a></li>
+</ul>
+
+<div class="card table-card p-0">
+  <div class="list-group list-group-flush">
+    {% for al in alertes %}
+    <div class="list-group-item d-flex justify-content-between align-items-start p-3">
+      <div class="d-flex gap-3">
+        <div class="icon-box"
+             style="background:{{ '#fde8e8' if al.type == 'ecart' else '#fff4e0' }};color:{{ '#c0392b' if al.type == 'ecart' else '#b5790a' }};">
+          <i class="bi {{ al.icone }}"></i>
+        </div>
+        <div>
+          <div class="fw-semibold">{{ al.titre }}</div>
+          <div class="text-muted small">{{ al.detail }}</div>
+          <div class="text-muted small">{{ al.date }}</div>
+        </div>
+      </div>
+      <div class="text-end">
+        {% if al.traitee %}
+        <span class="badge bg-success-subtle text-success mb-2 d-block">Traitée</span>
+        <button class="btn btn-sm btn-outline-secondary" disabled>Marquer comme traitée</button>
+        {% else %}
+        <span class="badge bg-danger-subtle text-danger mb-2 d-block">Non traitée</span>
+        <button class="btn btn-sm btn-outline-secondary">Marquer comme traitée</button>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted">Aucune alerte pour le moment.</div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock content %}

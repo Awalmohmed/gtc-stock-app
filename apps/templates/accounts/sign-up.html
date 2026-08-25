@@ -1,0 +1,87 @@
+{% extends 'layouts/gtc-auth.html' %}
+
+{% block title %}GTC Stock - Créer un compte{% endblock title %}
+
+{% block content %}
+
+<div class="d-none d-lg-flex col-lg-5 side-illustration">
+  <div><i class="bi bi-box-seam fs-1"></i></div>
+  <h2 class="mt-3">Rejoindre l'espace GTC Stock</h2>
+  <p class="opacity-75">Un compte par rôle, pour un accès adapté à chaque service.</p>
+  <ul class="mt-3">
+    <li><i class="bi bi-check-circle-fill"></i> Gestionnaire de stock</li>
+    <li><i class="bi bi-check-circle-fill"></i> Comptable</li>
+    <li><i class="bi bi-check-circle-fill"></i> Administrateur</li>
+  </ul>
+</div>
+
+<div class="col-12 col-lg-7 auth-panel">
+  <div class="auth-card">
+    <div class="brand mb-4"><i class="bi bi-box-seam"></i> GTC Stock</div>
+    <h4 class="fw-bold mb-1">Créer un compte</h4>
+    <p class="text-muted mb-4">Renseignez vos informations pour accéder à l'application.</p>
+
+    <form action="{{ url_for('accounts_sign_in') }}" method="get" data-validate novalidate autocomplete="on">
+      <div class="row">
+        <div class="col-6 mb-3">
+          <label class="form-label small fw-semibold" for="reg-nom">Nom</label>
+          <input type="text" id="reg-nom" name="nom" class="form-control" placeholder="Nom" autocomplete="family-name" required>
+        </div>
+        <div class="col-6 mb-3">
+          <label class="form-label small fw-semibold" for="reg-prenom">Prénom</label>
+          <input type="text" id="reg-prenom" name="prenom" class="form-control" placeholder="Prénom" autocomplete="given-name" required>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold" for="reg-user">Identifiant</label>
+        <div class="input-group">
+          <span class="input-group-text bg-white"><i class="bi bi-person"></i></span>
+          <input type="text" id="reg-user" name="identifiant" class="form-control" placeholder="ex : j.dupont" autocomplete="username" required>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold" for="reg-role">Rôle</label>
+        <select class="form-select" id="reg-role" name="role" required>
+          <option value="" selected disabled>Sélectionner un rôle</option>
+          <option>Gestionnaire de stock</option>
+          <option>Comptable</option>
+          <option>Administrateur</option>
+        </select>
+        <div class="form-text">Le rôle détermine les pages et actions accessibles une fois connecté.</div>
+      </div>
+
+      <div class="row">
+        <div class="col-6 mb-1">
+          <label class="form-label small fw-semibold" for="reg-pwd">Mot de passe</label>
+          <input type="password" id="reg-pwd" name="mot_de_passe" class="form-control"
+                 placeholder="••••••••" autocomplete="new-password" minlength="8"
+                 data-pwd-original data-pwd-strength required>
+          <div class="pwd-strength"><div class="pwd-strength-bar"></div></div>
+        </div>
+        <div class="col-6 mb-1">
+          <label class="form-label small fw-semibold" for="reg-pwd-confirm">Confirmation</label>
+          <input type="password" id="reg-pwd-confirm" name="mot_de_passe_confirmation" class="form-control"
+                 placeholder="••••••••" autocomplete="new-password" minlength="8"
+                 data-pwd-confirm required>
+        </div>
+      </div>
+      <p class="text-muted small mb-3">8 caractères minimum. Utilisez majuscule, chiffre et caractère spécial pour un mot de passe robuste.</p>
+
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="cgu" required>
+        <label class="form-check-label small" for="cgu">J'accepte les conditions d'utilisation internes de GTC sarl</label>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">Créer mon compte</button>
+    </form>
+
+    <p class="text-center small text-muted mt-4">
+      Déjà un compte ?
+      <a href="{{ url_for('accounts_sign_in') }}" class="text-decoration-none fw-semibold">Se connecter</a>
+    </p>
+  </div>
+</div>
+
+{% endblock content %}

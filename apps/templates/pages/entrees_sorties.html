@@ -1,0 +1,127 @@
+{% extends 'layouts/gtc-base.html' %}
+
+{% block title %}GTC Stock - Entrées / Sorties{% endblock title %}
+{% block page_title %}Entrées / Sorties de stock{% endblock page_title %}
+
+{% block content %}
+
+<div class="row g-3">
+  <!-- Formulaire Entrée -->
+  <div class="col-md-6">
+    <div class="card table-card p-3 h-100">
+      <h6 class="mb-3"><i class="bi bi-box-arrow-in-down text-success"></i> Nouvelle entrée</h6>
+      <form data-validate novalidate>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Article</label>
+          <select class="form-select" required>
+            <option value="" selected disabled>Sélectionner un article</option>
+            {% for a in articles %}
+            <option>{{ a.nom }} — {{ a.reference }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="row">
+          <div class="col-6 mb-2">
+            <label class="form-label small fw-semibold">Quantité</label>
+            <input type="number" min="1" class="form-control" placeholder="0" required>
+          </div>
+          <div class="col-6 mb-2">
+            <label class="form-label small fw-semibold">Date</label>
+            <input type="date" class="form-control" required>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Fournisseur</label>
+          <input type="text" class="form-control" placeholder="Nom du fournisseur" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">N° bordereau de réception</label>
+          <input type="text" class="form-control" placeholder="ex : BR-2026-0143" required>
+        </div>
+        <button type="submit" class="btn btn-success w-100 fw-semibold">Enregistrer l'entrée</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Formulaire Sortie -->
+  <div class="col-md-6">
+    <div class="card table-card p-3 h-100">
+      <h6 class="mb-3"><i class="bi bi-box-arrow-up text-danger"></i> Nouvelle sortie</h6>
+      <form data-validate novalidate>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Article</label>
+          <select class="form-select" required>
+            <option value="" selected disabled>Sélectionner un article</option>
+            {% for a in articles %}
+            <option>{{ a.nom }} — {{ a.reference }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="row">
+          <div class="col-6 mb-2">
+            <label class="form-label small fw-semibold">Quantité</label>
+            <input type="number" min="1" class="form-control" placeholder="0" required>
+          </div>
+          <div class="col-6 mb-2">
+            <label class="form-label small fw-semibold">Date</label>
+            <input type="date" class="form-control" required>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Justificatif</label>
+          <select class="form-select" required>
+            <option value="" selected disabled>Type de document</option>
+            <option>Bon de livraison</option>
+            <option>Bordereau de route</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">N° du document</label>
+          <input type="text" class="form-control" placeholder="ex : BL-2026-0087" required>
+        </div>
+        <button type="submit" class="btn btn-danger w-100 fw-semibold">Enregistrer la sortie</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Historique -->
+<div class="card table-card p-3 mt-4">
+  <h6 class="mb-3">Derniers mouvements enregistrés</h6>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead class="text-muted small">
+        <tr>
+          <th>Date</th>
+          <th>Article</th>
+          <th>Type</th>
+          <th>Référence document</th>
+          <th>Quantité</th>
+          <th>Saisi par</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in mouvements %}
+        <tr>
+          <td>{{ m.date }}</td>
+          <td>{{ m.article }}</td>
+          <td>
+            {% if m.type == 'Entrée' %}
+            <span class="badge bg-success-subtle text-success">Entrée</span>
+            {% else %}
+            <span class="badge bg-danger-subtle text-danger">Sortie</span>
+            {% endif %}
+          </td>
+          <td>{{ m.reference }}</td>
+          <td>{{ m.quantite }}</td>
+          <td>{{ m.saisi_par }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted text-center">Aucun mouvement enregistré.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock content %}

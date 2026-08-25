@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Bonne pratique : limite les origines autorisées à charger du contenu.
+     Bootstrap/icônes restent en CDN ici (voir README.txt) ; le reste
+     (style, script) est servi en local depuis ce même dossier. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline'; font-src https://cdnjs.cloudflare.com; script-src 'self';">
+<title>GTC Stock - Tableau de bord</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="d-flex">
+
+  <!-- Sidebar -->
+  <div class="sidebar p-3" style="width:230px;">
+    <div class="brand"><i class="bi bi-box-seam"></i> GTC Stock</div>
+    <nav class="nav flex-column mt-3">
+      <a class="nav-link active" href="index.html"><i class="bi bi-grid-1x2 me-2"></i> Tableau de bord</a>
+      <a class="nav-link" href="entrees_sorties.html"><i class="bi bi-arrow-down-up me-2"></i> Entrées / Sorties</a>
+      <a class="nav-link" href="fiche_stock.html"><i class="bi bi-card-list me-2"></i> Fiches de stock</a>
+      <a class="nav-link" href="rapprochement.html"><i class="bi bi-check2-circle me-2"></i> Rapprochement</a>
+      <a class="nav-link" href="alertes.html"><i class="bi bi-bell me-2"></i> Alertes</a>
+      <a class="nav-link" href="utilisateurs.html"><i class="bi bi-people me-2"></i> Utilisateurs</a>
+    </nav>
+  </div>
+
+  <!-- Main -->
+  <div class="flex-grow-1">
+    <div class="topbar d-flex justify-content-between align-items-center px-4 py-3">
+      <h5 class="mb-0">Tableau de bord</h5>
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-muted small">Gestionnaire de stock</span>
+        <div class="bg-secondary rounded-circle" style="width:36px;height:36px;"></div>
+        <a href="connexion.html" class="btn btn-sm btn-outline-secondary ms-2"><i class="bi bi-box-arrow-right"></i> Déconnexion</a>
+      </div>
+    </div>
+
+    <div class="p-4">
+      <!-- Stat cards -->
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+          <div class="card card-stat p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="text-muted small">Articles suivis</div>
+                <div class="fs-4 fw-bold">128</div>
+              </div>
+              <div class="icon-box" style="background:#eaf0ff;color:#3b5bdb;"><i class="bi bi-box"></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="card card-stat p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="text-muted small">En alerte</div>
+                <div class="fs-4 fw-bold text-danger">7</div>
+              </div>
+              <div class="icon-box" style="background:#fde8e8;color:#c0392b;"><i class="bi bi-exclamation-triangle"></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="card card-stat p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="text-muted small">Articles dormants</div>
+                <div class="fs-4 fw-bold text-warning">12</div>
+              </div>
+              <div class="icon-box" style="background:#fff4e0;color:#b5790a;"><i class="bi bi-hourglass-split"></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="card card-stat p-3">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="text-muted small">Écarts détectés</div>
+                <div class="fs-4 fw-bold text-danger">2</div>
+              </div>
+              <div class="icon-box" style="background:#fde8e8;color:#c0392b;"><i class="bi bi-shield-exclamation"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="card table-card p-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="mb-0">Fiche de stock — Aperçu des articles</h6>
+          <button class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Nouvel article</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="text-muted small">
+              <tr>
+                <th>Article</th>
+                <th>Référence</th>
+                <th>Quantité</th>
+                <th>Seuil</th>
+                <th>Statut</th>
+                <th>Rapprochement Sage 100</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Rame de papier A4</td>
+                <td>REF-0021</td>
+                <td>5</td>
+                <td>10</td>
+                <td><span class="badge badge-alerte">Alerte</span></td>
+                <td><span class="badge bg-success-subtle text-success">Conforme</span></td>
+              </tr>
+              <tr>
+                <td>Cartouche imprimante</td>
+                <td>REF-0045</td>
+                <td>50</td>
+                <td>20</td>
+                <td><span class="badge badge-ok">OK</span></td>
+                <td><span class="badge bg-success-subtle text-success">Conforme</span></td>
+              </tr>
+              <tr>
+                <td>Classeur A4</td>
+                <td>REF-0102</td>
+                <td>8</td>
+                <td>15</td>
+                <td><span class="badge badge-alerte">Alerte</span></td>
+                <td><span class="badge bg-danger-subtle text-danger">Écart : -3</span></td>
+              </tr>
+              <tr>
+                <td>Chaise bureau (modèle X)</td>
+                <td>REF-0230</td>
+                <td>14</td>
+                <td>2</td>
+                <td><span class="badge badge-dormant">Dormant</span></td>
+                <td><span class="badge bg-success-subtle text-success">Conforme</span></td>
+              </tr>
+              <tr>
+                <td>Stylo bille bleu (boîte)</td>
+                <td>REF-0011</td>
+                <td>96</td>
+                <td>30</td>
+                <td><span class="badge badge-ok">OK</span></td>
+                <td><span class="badge bg-success-subtle text-success">Conforme</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+</body>
+</html>

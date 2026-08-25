@@ -1,0 +1,125 @@
+/* =========================================================
+   GTC Stock — Feuille de style commune
+   Toutes les couleurs et composants custom du projet sont
+   centralisés ici plutôt que répétés dans chaque page HTML.
+   ========================================================= */
+
+:root {
+  --gtc-navy: #111c44;
+  --gtc-navy-light: #1e2a5e;
+  --gtc-blue: #3b5bdb;
+  --gtc-blue-dark: #2f49b3;
+  --gtc-bg: #f5f7fb;
+}
+
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--gtc-bg);
+}
+
+/* ---------- Layout tableau de bord ---------- */
+.sidebar {
+  min-height: 100vh;
+  background: var(--gtc-navy);
+}
+.sidebar .nav-link {
+  color: #a9b7d0;
+  font-size: 0.92rem;
+  padding: .6rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+.sidebar .nav-link.active,
+.sidebar .nav-link:hover {
+  background: var(--gtc-navy-light);
+  color: #fff;
+}
+.sidebar .brand {
+  color: #fff;
+  font-weight: 700;
+  padding: 1.2rem 1rem;
+  font-size: 1.1rem;
+}
+.topbar {
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+
+/* ---------- Cartes ---------- */
+.card-stat {
+  border: none;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+}
+.card-stat .icon-box {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+.table-card {
+  border: none;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+}
+
+/* ---------- Badges de statut stock ---------- */
+.badge-alerte { background: #fde8e8; color: #c0392b; font-weight: 600; }
+.badge-ok     { background: #e3f7e9; color: #1f8a4c; font-weight: 600; }
+.badge-dormant{ background: #fff4e0; color: #b5790a; font-weight: 600; }
+
+/* ---------- Pages d'authentification ---------- */
+.auth-body {
+  min-height: 100vh;
+  display: flex;
+  background: var(--gtc-navy);
+}
+.side-illustration {
+  background: linear-gradient(160deg, var(--gtc-navy) 0%, var(--gtc-navy-light) 60%, var(--gtc-blue) 130%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4rem;
+}
+.side-illustration h2 { font-weight: 700; }
+.side-illustration .stat {
+  background: rgba(255,255,255,.08);
+  border-radius: 12px;
+  padding: 1rem 1.2rem;
+}
+.side-illustration ul { list-style: none; padding: 0; }
+.side-illustration ul li { padding: .4rem 0; }
+.side-illustration ul li i { margin-right: .5rem; color: #8fd19e; }
+
+.auth-panel {
+  background: var(--gtc-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+.auth-card { max-width: 440px; width: 100%; }
+.brand { font-weight: 700; color: var(--gtc-navy); font-size: 1.2rem; }
+
+/* ---------- Formulaires ---------- */
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--gtc-blue);
+  box-shadow: 0 0 0 .2rem rgba(59,91,219,.15);
+}
+.btn-primary {
+  background: var(--gtc-blue);
+  border-color: var(--gtc-blue);
+}
+.btn-primary:hover {
+  background: var(--gtc-blue-dark);
+  border-color: var(--gtc-blue-dark);
+}
+
+/* Indicateur de force du mot de passe (utilisé par js/main.js) */
+.pwd-strength { height: 4px; border-radius: 2px; background: #e2e2e2; overflow: hidden; margin-top: 6px; }
+.pwd-strength-bar { height: 100%; width: 0%; transition: width .2s ease, background .2s ease; }
