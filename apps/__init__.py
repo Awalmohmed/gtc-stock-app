@@ -5,8 +5,10 @@ Copyright (c) 2019 - present AppSeed.us
 
 import os
 
-# import Flask 
+# import Flask
 from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 
 from .config import Config
 
@@ -14,7 +16,14 @@ from .config import Config
 app = Flask(__name__)
 
 # load Configuration
-app.config.from_object( Config ) 
+app.config.from_object( Config )
+
+# Database (SQLAlchemy) + migrations (Flask-Migrate / Alembic)
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+# Import models first so Alembic/Flask-Migrate can detect them
+from apps import models
 
 # Import routing to render the pages
 from apps import views

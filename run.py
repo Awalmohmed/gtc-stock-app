@@ -4,13 +4,10 @@ Copyright (c) 2019 - present AppSeed.us
 """
 
 from flask_minify  import Minify
-#from flask_migrate import Migrate
 
 from apps import app
 
-#Migrate(app, db)
-
-DEBUG = app.config['DEBUG'] 
+DEBUG = app.config['DEBUG']
 
 if not DEBUG:
     Minify(app=app, html=True, js=False, cssless=False)

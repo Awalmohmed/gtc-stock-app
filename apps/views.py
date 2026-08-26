@@ -10,8 +10,8 @@ from jinja2  import TemplateNotFound
 # App modules
 from apps import app
 from apps.gtc_data import (
-  ARTICLES, MOUVEMENTS, RAPPROCHEMENT, ALERTES, UTILISATEURS,
-  get_stats, get_article, get_historique,
+  ARTICLES, MOUVEMENTS, RAPPROCHEMENT, ALERTES,
+  get_stats, get_article, get_historique, get_all_users,
   verify_credentials, add_user, get_user_by_identifiant,
 )
 from apps.auth import login_required, admin_required
@@ -60,7 +60,7 @@ def pages_alertes():
 @login_required
 def pages_utilisateurs():
   return render_template('pages/utilisateurs.html', segment='utilisateurs', parent='pages',
-                          utilisateurs=UTILISATEURS)
+                          utilisateurs=get_all_users())
 
 # Pages
 
@@ -106,9 +106,9 @@ def accounts_sign_in():
     user = verify_credentials(identifiant, mot_de_passe)
     if user:
       session.clear()
-      session['identifiant'] = user['identifiant']
-      session['nom'] = user['nom']
-      session['role'] = user['role']
+      session['identifiant'] = user.identifiant
+      session['nom'] = user.nom
+      session['role'] = user.role
       next_url = request.args.get('next') or request.form.get('next')
       return redirect(next_url or url_for('pages_dashboard'))
     flash("Identifiant ou mot de passe incorrect.", "danger")

@@ -1,18 +1,20 @@
 # -*- encoding: utf-8 -*-
 """
-GTC Stock — Données d'exemple (en mémoire, pas de base de données).
+GTC Stock — Données d'exemple et accès aux données.
 
-Ce module centralise les données factices utilisées par les pages
-"métier" de GTC Stock (tableau de bord, entrées/sorties, fiches de
-stock, rapprochement Sage 100, alertes, utilisateurs) afin que les
-mêmes articles/chiffres restent cohérents d'une page à l'autre.
-
-A terme, ces listes seront remplacées par de vraies requêtes vers une
-base de données (voir apps/config.py et flask-sqlalchemy déjà présent
-dans requirements.txt).
+Les articles, mouvements, rapprochements et alertes ci-dessous restent
+des données factices en mémoire (pas encore de base de données pour
+ces objets métier). En revanche, les comptes utilisateurs sont
+désormais stockés dans une vraie base SQLite via SQLAlchemy
+(voir apps/models.py et apps/config.py) — les fonctions
+get_user_by_identifiant, verify_credentials et add_user interrogent la
+table "utilisateurs".
 """
 
-from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+
+from apps import db
+from apps.models import Utilisateur
 
 # ---------------------------------------------------------------------
 # Articles suivis en stock
@@ -170,35 +172,14 @@ ALERTES = [
 # ---------------------------------------------------------------------
 # Comptes utilisateurs (vue administrateur)
 #
-# NOTE — prototype sans base de données : les mots de passe sont
-# hachés (werkzeug.security) et gardés en mémoire ici. Mots de passe
-# de démonstration ci-dessous ; à remplacer par une vraie table
-# "users" (flask-sqlalchemy) le jour où une base est branchée.
+# Stockés en base (table "utilisateurs", voir apps/models.py). Les
+# quatre comptes de démonstration sont insérés comme données initiales
+# par la première migration (voir migrations/versions/) :
 #   j.dupont  -> Dupont@2026
 #   m.kouam   -> Kouam@2026
 #   p.meka    -> Meka@2026
 #   s.nkolo   -> compte désactivé (connexion bloquée quel que soit le mot de passe)
 # ---------------------------------------------------------------------
-ROLE_CLASSES = {
-    "Gestionnaire de stock": "primary",
-    "Comptable": "info",
-    "Administrateur": "dark",
-}
-
-UTILISATEURS = [
-    {"nom": "Jean Dupont", "identifiant": "j.dupont", "role": "Gestionnaire de stock",
-     "role_classe": "primary", "statut": "Actif", "derniere_connexion": "24/08/2026 — 08:03",
-     "mot_de_passe_hash": generate_password_hash("Dupont@2026")},
-    {"nom": "Marie Kouam", "identifiant": "m.kouam", "role": "Comptable",
-     "role_classe": "info", "statut": "Actif", "derniere_connexion": "23/08/2026 — 17:45",
-     "mot_de_passe_hash": generate_password_hash("Kouam@2026")},
-    {"nom": "Paul Meka", "identifiant": "p.meka", "role": "Administrateur",
-     "role_classe": "dark", "statut": "Actif", "derniere_connexion": "24/08/2026 — 07:00",
-     "mot_de_passe_hash": generate_password_hash("Meka@2026")},
-    {"nom": "Sara Nkolo", "identifiant": "s.nkolo", "role": "Gestionnaire de stock",
-     "role_classe": "primary", "statut": "Désactivé", "derniere_connexion": "02/06/2026 — 11:20",
-     "mot_de_passe_hash": generate_password_hash("Nkolo@2026")},
-]
 
 
 def get_stats():
@@ -224,38 +205,37 @@ def get_historique(article_id):
     return HISTORIQUE.get(article_id, [])
 
 
+def get_all_users():
+    """Retourne tous les utilisateurs, triés par nom (vue administrateur)."""
+    return Utilisateur.query.order_by(Utilisateur.nom).all()
+
+
 def get_user_by_identifiant(identifiant):
     """Retourne l'utilisateur correspondant à l'identifiant, ou None."""
-    for user in UTILISATEURS:
-        if user["identifiant"] == identifiant:
-            return user
-    return None
+    return Utilisateur.query.filter_by(identifiant=identifiant).first()
 
 
 def verify_credentials(identifiant, mot_de_passe):
     """Vérifie identifiant/mot de passe. Retourne l'utilisateur si valide
-    et actif, sinon None (compte inconnu, désactivé ou mot de passe faux)."""
+    et actif, sinon None (compte inconnu, désactivé ou mot de passe faux).
+    Met à jour la date de dernière connexion en cas de succès."""
     user = get_user_by_identifiant(identifiant)
-    if not user or user["statut"] != "Actif":
+    if not user or not user.actif:
         return None
-    if not check_password_hash(user["mot_de_passe_hash"], mot_de_passe):
+    if not user.check_password(mot_de_passe):
         return None
+    user.derniere_connexion = datetime.now().strftime("%d/%m/%Y — %H:%M")
+    db.session.commit()
     return user
 
 
 def add_user(nom, identifiant, role, mot_de_passe):
-    """Crée un nouvel utilisateur en mémoire. Lève ValueError si
+    """Crée un nouvel utilisateur en base. Lève ValueError si
     l'identifiant existe déjà."""
     if get_user_by_identifiant(identifiant):
         raise ValueError("Cet identifiant existe déjà.")
-    user = {
-        "nom": nom,
-        "identifiant": identifiant,
-        "role": role,
-        "role_classe": ROLE_CLASSES.get(role, "secondary"),
-        "statut": "Actif",
-        "derniere_connexion": "—",
-        "mot_de_passe_hash": generate_password_hash(mot_de_passe),
-    }
-    UTILISATEURS.append(user)
+    user = Utilisateur(nom=nom, identifiant=identifiant, role=role, actif=True)
+    user.set_password(mot_de_passe)
+    db.session.add(user)
+    db.session.commit()
     return user
