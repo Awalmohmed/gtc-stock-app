@@ -2,17 +2,36 @@
 """
 GTC Stock — Authentification minimale basée sur la session Flask.
 
-Prototype sans base de données : les comptes vivent en mémoire dans
-apps/gtc_data.py (UTILISATEURS). Suffisant pour protéger les pages et
-réserver la création de compte aux administrateurs ; à remplacer par
-flask-login + une vraie table "users" le jour où une base est branchée.
+Les comptes sont stockés en base (voir apps/models.py, table
+"utilisateurs"). Ce module gère uniquement la session Flask qui
+matérialise la connexion : décorateurs login_required / admin_required,
+et accès à l'utilisateur courant depuis les templates.
 """
 
 from functools import wraps
+from urllib.parse import urlparse, urljoin
 
 from flask import session, redirect, url_for, flash, request
 
 from apps import app
+
+
+def is_safe_next_url(target):
+    """Vérifie que `target` est une URL locale (même origine), pour éviter
+    les redirections ouvertes (open redirect) via le paramètre `next`."""
+    if not target:
+        return False
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and test_url.netloc == ref_url.netloc
+
+
+def _current_full_path():
+    """URL relative courante (chemin + query string), sûre par construction
+    puisque dérivée de la requête entrante elle-même."""
+    if request.query_string:
+        return f"{request.path}?{request.query_string.decode()}"
+    return request.path
 
 
 def current_user():
@@ -32,7 +51,7 @@ def login_required(view):
     def wrapped(*args, **kwargs):
         if 'identifiant' not in session:
             flash("Veuillez vous connecter pour accéder à cette page.", "warning")
-            return redirect(url_for('accounts_sign_in', next=request.path))
+            return redirect(url_for('accounts_sign_in', next=_current_full_path()))
         return view(*args, **kwargs)
     return wrapped
 
@@ -43,7 +62,7 @@ def admin_required(view):
     def wrapped(*args, **kwargs):
         if 'identifiant' not in session:
             flash("Veuillez vous connecter pour accéder à cette page.", "warning")
-            return redirect(url_for('accounts_sign_in', next=request.path))
+            return redirect(url_for('accounts_sign_in', next=_current_full_path()))
         if session.get('role') != 'Administrateur':
             flash("Cette page est réservée aux administrateurs.", "danger")
             return redirect(url_for('pages_dashboard'))

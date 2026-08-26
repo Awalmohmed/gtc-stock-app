@@ -14,7 +14,8 @@ from apps.gtc_data import (
   get_stats, get_article, get_historique, get_all_users,
   verify_credentials, add_user, get_user_by_identifiant,
 )
-from apps.auth import login_required, admin_required
+from apps.models import ROLE_CLASSES
+from apps.auth import login_required, admin_required, is_safe_next_url
 
 # App main route -- redirige vers le tableau de bord GTC Stock
 @app.route('/')
@@ -110,6 +111,8 @@ def accounts_sign_in():
       session['nom'] = user.nom
       session['role'] = user.role
       next_url = request.args.get('next') or request.form.get('next')
+      if not is_safe_next_url(next_url):
+        next_url = None
       return redirect(next_url or url_for('pages_dashboard'))
     flash("Identifiant ou mot de passe incorrect.", "danger")
   return render_template('accounts/sign-in.html', segment='sign_in', parent='accounts', stats=get_stats())
@@ -128,6 +131,8 @@ def accounts_sign_up():
     erreur = None
     if not (nom and identifiant and role and mot_de_passe):
       erreur = "Merci de renseigner tous les champs obligatoires."
+    elif role not in ROLE_CLASSES:
+      erreur = "Rôle invalide."
     elif mot_de_passe != mot_de_passe_confirmation:
       erreur = "La confirmation du mot de passe ne correspond pas."
     elif len(mot_de_passe) < 8:
@@ -140,7 +145,11 @@ def accounts_sign_up():
       return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts')
 
     nom_complet = f"{prenom} {nom}".strip()
-    add_user(nom_complet, identifiant, role, mot_de_passe)
+    try:
+      add_user(nom_complet, identifiant, role, mot_de_passe)
+    except ValueError as e:
+      flash(str(e), "danger")
+      return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts')
     flash(f"Compte « {identifiant} » créé avec succès.", "success")
     return redirect(url_for('pages_utilisateurs'))
 

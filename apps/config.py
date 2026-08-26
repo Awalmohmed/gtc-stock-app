@@ -18,6 +18,13 @@ class Config(object):
     # App Config - the minimal footprint
     SECRET_KEY = os.getenv('SECRET_KEY', 'S#perS3crEt_9999')
 
+    # Cookies de session : non accessibles en JS, jamais envoyés en
+    # cross-site, et réservés à HTTPS dès que l'app ne tourne plus en debug
+    # (ex. Render, qui sert l'app en TLS).
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = not DEBUG
+
     # Database — SQLite en local par défaut, surchargeable via DATABASE_URL
     # (ex. Postgres en production).
     SQLALCHEMY_DATABASE_URI = os.getenv(

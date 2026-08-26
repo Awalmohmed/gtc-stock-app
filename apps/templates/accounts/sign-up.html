@@ -24,6 +24,7 @@
     {% include 'includes/flash-messages.html' %}
 
     <form action="{{ url_for('accounts_sign_up') }}" method="post" data-validate novalidate autocomplete="on">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="row">
         <div class="col-6 mb-3">
           <label class="form-label small fw-semibold" for="reg-nom">Nom</label>

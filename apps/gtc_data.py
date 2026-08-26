@@ -13,6 +13,8 @@ table "utilisateurs".
 
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
+
 from apps import db
 from apps.models import Utilisateur
 
@@ -231,11 +233,17 @@ def verify_credentials(identifiant, mot_de_passe):
 
 def add_user(nom, identifiant, role, mot_de_passe):
     """Crée un nouvel utilisateur en base. Lève ValueError si
-    l'identifiant existe déjà."""
+    l'identifiant existe déjà (y compris en cas de double soumission
+    quasi simultanée : la contrainte d'unicité en base fait foi, pas
+    seulement la vérification préalable)."""
     if get_user_by_identifiant(identifiant):
         raise ValueError("Cet identifiant existe déjà.")
     user = Utilisateur(nom=nom, identifiant=identifiant, role=role, actif=True)
     user.set_password(mot_de_passe)
     db.session.add(user)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError("Cet identifiant existe déjà.")
     return user
