@@ -2,14 +2,15 @@
 
 {% block title %}GTC Stock - Utilisateurs{% endblock title %}
 {% block page_title %}Gestion des utilisateurs{% endblock page_title %}
-{% block user_role %}Administrateur{% endblock user_role %}
 
 {% block content %}
 
 <div class="card table-card p-3">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h6 class="mb-0">Comptes utilisateurs</h6>
+    {% if current_user and current_user.role == 'Administrateur' %}
     <a href="{{ url_for('accounts_sign_up') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Ajouter un utilisateur</a>
+    {% endif %}
   </div>
   <div class="table-responsive">
     <table class="table align-middle">

@@ -30,8 +30,13 @@
     <h4 class="fw-bold mb-1">Connexion</h4>
     <p class="text-muted mb-4">Accédez à votre espace de gestion de stock.</p>
 
+    {% include 'includes/flash-messages.html' %}
+
     <!-- data-validate : active la validation Bootstrap côté client (confort uniquement) -->
-    <form action="{{ url_for('pages_dashboard') }}" method="get" data-validate novalidate autocomplete="on">
+    <form action="{{ url_for('accounts_sign_in') }}" method="post" data-validate novalidate autocomplete="on">
+      {% if request.args.get('next') %}
+      <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+      {% endif %}
       <div class="mb-3">
         <label class="form-label small fw-semibold" for="login-user">Identifiant</label>
         <div class="input-group">
@@ -64,8 +69,7 @@
     </form>
 
     <p class="text-center small text-muted mt-4">
-      Pas encore de compte ?
-      <a href="{{ url_for('accounts_sign_up') }}" class="text-decoration-none fw-semibold">Créer un compte</a>
+      Besoin d'un compte ? Contactez un administrateur GTC Stock.
     </p>
   </div>
 </div>

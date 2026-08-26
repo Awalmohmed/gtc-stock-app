@@ -19,9 +19,11 @@
   <div class="auth-card">
     <div class="brand mb-4"><i class="bi bi-box-seam"></i> GTC Stock</div>
     <h4 class="fw-bold mb-1">Créer un compte</h4>
-    <p class="text-muted mb-4">Renseignez vos informations pour accéder à l'application.</p>
+    <p class="text-muted mb-4">Réservé aux administrateurs : renseignez les informations du nouveau compte.</p>
 
-    <form action="{{ url_for('accounts_sign_in') }}" method="get" data-validate novalidate autocomplete="on">
+    {% include 'includes/flash-messages.html' %}
+
+    <form action="{{ url_for('accounts_sign_up') }}" method="post" data-validate novalidate autocomplete="on">
       <div class="row">
         <div class="col-6 mb-3">
           <label class="form-label small fw-semibold" for="reg-nom">Nom</label>
@@ -78,8 +80,7 @@
     </form>
 
     <p class="text-center small text-muted mt-4">
-      Déjà un compte ?
-      <a href="{{ url_for('accounts_sign_in') }}" class="text-decoration-none fw-semibold">Se connecter</a>
+      <a href="{{ url_for('pages_utilisateurs') }}" class="text-decoration-none fw-semibold">&larr; Retour à la liste des utilisateurs</a>
     </p>
   </div>
 </div>

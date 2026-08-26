@@ -4,7 +4,7 @@ Copyright (c) 2019 - present AppSeed.us
 """
 
 # Flask modules
-from flask   import render_template, request
+from flask   import render_template, request, redirect, url_for, session, flash
 from jinja2  import TemplateNotFound
 
 # App modules
@@ -12,19 +12,18 @@ from apps import app
 from apps.gtc_data import (
   ARTICLES, MOUVEMENTS, RAPPROCHEMENT, ALERTES, UTILISATEURS,
   get_stats, get_article, get_historique,
+  verify_credentials, add_user, get_user_by_identifiant,
 )
+from apps.auth import login_required, admin_required
 
-# App main route + generic routing
-@app.route('/', defaults={'path': 'index.html'})
+# App main route -- redirige vers le tableau de bord GTC Stock
 @app.route('/')
 def index():
-  try:
-    return render_template( 'pages/index.html', segment='index', parent='pages')
-  except TemplateNotFound:
-    return render_template('pages/index.html'), 404
+  return redirect(url_for('pages_dashboard'))
 
 # Pages -- Dashboard
 @app.route('/pages/dashboard/')
+@login_required
 def pages_dashboard():
   return render_template('pages/dashboard/dashboard.html', segment='dashboard', parent='pages',
                           stats=get_stats(), articles=ARTICLES)
@@ -32,11 +31,13 @@ def pages_dashboard():
 # Pages -- GTC Stock
 
 @app.route('/pages/entrees-sorties/')
+@login_required
 def pages_entrees_sorties():
   return render_template('pages/entrees_sorties.html', segment='entrees_sorties', parent='pages',
                           articles=ARTICLES, mouvements=MOUVEMENTS)
 
 @app.route('/pages/fiche-stock/')
+@login_required
 def pages_fiche_stock():
   article_id = request.args.get('article', type=int)
   article = get_article(article_id) or ARTICLES[0]
@@ -44,16 +45,19 @@ def pages_fiche_stock():
                           articles=ARTICLES, article=article, historique=get_historique(article['id']))
 
 @app.route('/pages/rapprochement/')
+@login_required
 def pages_rapprochement():
   return render_template('pages/rapprochement.html', segment='rapprochement', parent='pages',
                           rapprochement=RAPPROCHEMENT)
 
 @app.route('/pages/alertes/')
+@login_required
 def pages_alertes():
   return render_template('pages/alertes.html', segment='alertes', parent='pages',
                           alertes=ALERTES)
 
 @app.route('/pages/utilisateurs/')
+@login_required
 def pages_utilisateurs():
   return render_template('pages/utilisateurs.html', segment='utilisateurs', parent='pages',
                           utilisateurs=UTILISATEURS)
@@ -61,20 +65,24 @@ def pages_utilisateurs():
 # Pages
 
 @app.route('/pages/transactions/')
+@login_required
 def pages_transactions():
   return render_template('pages/transactions.html', segment='transactions', parent='pages')
 
 @app.route('/pages/settings/')
+@login_required
 def pages_settings():
   return render_template('pages/settings.html', segment='settings', parent='pages')
 
 @app.route('/pages/upgrade-to-pro/')
+@login_required
 def pages_upgrade_to_pro():
   return render_template('pages/upgrade-to-pro.html', segment='upgrade_to_pro', parent='pages')
 
 # Pages -- Tables
 
 @app.route('/pages/tables/bootstrap-tables/')
+@login_required
 def pages_tables_bootstrap_tables():
   return render_template('pages/tables/bootstrap-tables.html', segment='bootstrap_tables', parent='tables')
 
@@ -90,13 +98,59 @@ def pages_examples_500():
 
 # Accounts
 
-@app.route('/accounts/sign-in/')
+@app.route('/accounts/sign-in/', methods=['GET', 'POST'])
 def accounts_sign_in():
+  if request.method == 'POST':
+    identifiant = (request.form.get('identifiant') or '').strip()
+    mot_de_passe = request.form.get('mot_de_passe') or ''
+    user = verify_credentials(identifiant, mot_de_passe)
+    if user:
+      session.clear()
+      session['identifiant'] = user['identifiant']
+      session['nom'] = user['nom']
+      session['role'] = user['role']
+      next_url = request.args.get('next') or request.form.get('next')
+      return redirect(next_url or url_for('pages_dashboard'))
+    flash("Identifiant ou mot de passe incorrect.", "danger")
   return render_template('accounts/sign-in.html', segment='sign_in', parent='accounts', stats=get_stats())
 
-@app.route('/accounts/sign-up/')
+@app.route('/accounts/sign-up/', methods=['GET', 'POST'])
+@admin_required
 def accounts_sign_up():
+  if request.method == 'POST':
+    nom = (request.form.get('nom') or '').strip()
+    prenom = (request.form.get('prenom') or '').strip()
+    identifiant = (request.form.get('identifiant') or '').strip()
+    role = request.form.get('role') or ''
+    mot_de_passe = request.form.get('mot_de_passe') or ''
+    mot_de_passe_confirmation = request.form.get('mot_de_passe_confirmation') or ''
+
+    erreur = None
+    if not (nom and identifiant and role and mot_de_passe):
+      erreur = "Merci de renseigner tous les champs obligatoires."
+    elif mot_de_passe != mot_de_passe_confirmation:
+      erreur = "La confirmation du mot de passe ne correspond pas."
+    elif len(mot_de_passe) < 8:
+      erreur = "Le mot de passe doit contenir au moins 8 caractères."
+    elif get_user_by_identifiant(identifiant):
+      erreur = "Cet identifiant existe déjà."
+
+    if erreur:
+      flash(erreur, "danger")
+      return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts')
+
+    nom_complet = f"{prenom} {nom}".strip()
+    add_user(nom_complet, identifiant, role, mot_de_passe)
+    flash(f"Compte « {identifiant} » créé avec succès.", "success")
+    return redirect(url_for('pages_utilisateurs'))
+
   return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts')
+
+@app.route('/accounts/logout/')
+def accounts_logout():
+  session.clear()
+  flash("Vous avez été déconnecté.", "info")
+  return redirect(url_for('accounts_sign_in'))
 
 @app.route('/accounts/forgot-password/')
 def accounts_forgot_password():
