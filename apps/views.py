@@ -16,6 +16,7 @@ from apps.gtc_data import (
 )
 from apps.models import ROLE_CLASSES
 from apps.auth import login_required, admin_required, is_safe_next_url
+from apps.rate_limit import secondes_avant_deblocage, enregistrer_echec, reinitialiser
 
 # App main route -- redirige vers le tableau de bord GTC Stock
 @app.route('/')
@@ -104,8 +105,22 @@ def accounts_sign_in():
   if request.method == 'POST':
     identifiant = (request.form.get('identifiant') or '').strip()
     mot_de_passe = request.form.get('mot_de_passe') or ''
+
+    # Rate-limiting anti brute-force : une clé par identifiant visé (protège
+    # ce compte quelle que soit l'IP) et une par IP (protège contre le
+    # balayage de plusieurs identifiants depuis une même source).
+    cle_identifiant = f"id:{identifiant.lower()}"
+    cle_ip = f"ip:{request.remote_addr or 'inconnue'}"
+    attente = max(secondes_avant_deblocage(cle_identifiant), secondes_avant_deblocage(cle_ip))
+    if attente > 0:
+      minutes = max(1, (attente + 59) // 60)
+      flash(f"Trop de tentatives de connexion. Réessayez dans {minutes} minute(s).", "danger")
+      return render_template('accounts/sign-in.html', segment='sign_in', parent='accounts', stats=get_stats())
+
     user = verify_credentials(identifiant, mot_de_passe)
     if user:
+      reinitialiser(cle_identifiant)
+      reinitialiser(cle_ip)
       session.clear()
       session['identifiant'] = user.identifiant
       session['nom'] = user.nom
@@ -114,6 +129,9 @@ def accounts_sign_in():
       if not is_safe_next_url(next_url):
         next_url = None
       return redirect(next_url or url_for('pages_dashboard'))
+
+    enregistrer_echec(cle_identifiant)
+    enregistrer_echec(cle_ip)
     flash("Identifiant ou mot de passe incorrect.", "danger")
   return render_template('accounts/sign-in.html', segment='sign_in', parent='accounts', stats=get_stats())
 
