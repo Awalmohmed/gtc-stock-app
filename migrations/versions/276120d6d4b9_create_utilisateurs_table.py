@@ -5,6 +5,8 @@ Revises:
 Create Date: 2026-08-26 09:54:13.306682
 
 """
+import os
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -31,15 +33,27 @@ utilisateurs_table = sa.table(
 )
 
 # Comptes de démonstration existants avant la mise en place de la base.
+#
+# ⚠️ SÉCURITÉ — les mots de passe ci-dessous sont des valeurs par défaut de
+# développement local UNIQUEMENT (et déjà documentées dans l'historique
+# public du dépôt : ne pas les considérer comme secrètes). Sur tout
+# environnement réellement exposé (staging, production), surcharger-les
+# via les variables d'environnement SEED_PWD_* avant `flask db upgrade`,
+# ou changer ces mots de passe depuis l'application juste après le premier
+# déploiement — p.meka est un compte Administrateur.
 COMPTES_INITIAUX = [
     {"nom": "Jean Dupont", "identifiant": "j.dupont", "role": "Gestionnaire de stock",
-     "mot_de_passe": "Dupont@2026", "actif": True, "derniere_connexion": "24/08/2026 — 08:03"},
+     "mot_de_passe": os.getenv("SEED_PWD_J_DUPONT", "Dupont@2026"),
+     "actif": True, "derniere_connexion": "24/08/2026 — 08:03"},
     {"nom": "Marie Kouam", "identifiant": "m.kouam", "role": "Comptable",
-     "mot_de_passe": "Kouam@2026", "actif": True, "derniere_connexion": "23/08/2026 — 17:45"},
+     "mot_de_passe": os.getenv("SEED_PWD_M_KOUAM", "Kouam@2026"),
+     "actif": True, "derniere_connexion": "23/08/2026 — 17:45"},
     {"nom": "Paul Meka", "identifiant": "p.meka", "role": "Administrateur",
-     "mot_de_passe": "Meka@2026", "actif": True, "derniere_connexion": "24/08/2026 — 07:00"},
+     "mot_de_passe": os.getenv("SEED_PWD_P_MEKA", "Meka@2026"),
+     "actif": True, "derniere_connexion": "24/08/2026 — 07:00"},
     {"nom": "Sara Nkolo", "identifiant": "s.nkolo", "role": "Gestionnaire de stock",
-     "mot_de_passe": "Nkolo@2026", "actif": False, "derniere_connexion": "02/06/2026 — 11:20"},
+     "mot_de_passe": os.getenv("SEED_PWD_S_NKOLO", "Nkolo@2026"),
+     "actif": False, "derniere_connexion": "02/06/2026 — 11:20"},
 ]
 
 

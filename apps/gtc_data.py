@@ -175,12 +175,12 @@ ALERTES = [
 # Comptes utilisateurs (vue administrateur)
 #
 # Stockés en base (table "utilisateurs", voir apps/models.py). Les
-# quatre comptes de démonstration sont insérés comme données initiales
-# par la première migration (voir migrations/versions/) :
-#   j.dupont  -> Dupont@2026
-#   m.kouam   -> Kouam@2026
-#   p.meka    -> Meka@2026
-#   s.nkolo   -> compte désactivé (connexion bloquée quel que soit le mot de passe)
+# quatre comptes de démonstration (j.dupont, m.kouam, p.meka administrateur,
+# s.nkolo désactivé) sont insérés comme données initiales par la première
+# migration (voir migrations/versions/276120d6d4b9_*.py) — leurs mots de
+# passe par défaut n'y sont documentés qu'à titre de dev local et sont
+# surchargeables via variables d'environnement (voir cette migration) :
+# à changer avant tout déploiement réellement exposé.
 # ---------------------------------------------------------------------
 
 

@@ -11,3 +11,17 @@ services:
         generateValue: true
       - key: WEB_CONCURRENCY
         value: 4
+      - key: SESSION_COOKIE_SECURE
+        value: 'True'  # Render sert l'app en HTTPS ; à laisser à False en local (http://)
+      # Mots de passe des 4 comptes de démonstration insérés par la première
+      # migration (voir migrations/versions/276120d6d4b9_*.py) : générés
+      # aléatoirement ici pour ne PAS utiliser les valeurs par défaut de dev
+      # local, déjà documentées dans l'historique public du dépôt.
+      - key: SEED_PWD_J_DUPONT
+        generateValue: true
+      - key: SEED_PWD_M_KOUAM
+        generateValue: true
+      - key: SEED_PWD_P_MEKA
+        generateValue: true
+      - key: SEED_PWD_S_NKOLO
+        generateValue: true

@@ -21,6 +21,14 @@ def is_safe_next_url(target):
     les redirections ouvertes (open redirect) via le paramètre `next`."""
     if not target:
         return False
+    # Un backslash dans le chemin (ex. "/\evil.com") passe le test de
+    # netloc ci-dessous (urlparse ne le traite pas comme un séparateur),
+    # mais Werkzeug le renvoie tel quel dans l'en-tête Location, et les
+    # navigateurs (spec WHATWG URL) le normalisent en "//evil.com" —
+    # une URL protocol-relative qui redirige bien hors du site. On
+    # rejette donc tout `target` contenant un backslash, par précaution.
+    if '\\' in target:
+        return False
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
     return test_url.scheme in ('http', 'https') and test_url.netloc == ref_url.netloc

@@ -19,11 +19,14 @@ class Config(object):
     SECRET_KEY = os.getenv('SECRET_KEY', 'S#perS3crEt_9999')
 
     # Cookies de session : non accessibles en JS, jamais envoyés en
-    # cross-site, et réservés à HTTPS dès que l'app ne tourne plus en debug
-    # (ex. Render, qui sert l'app en TLS).
+    # cross-site. SESSION_COOKIE_SECURE est piloté explicitement par une
+    # variable d'environnement (plutôt que déduit de DEBUG, qui vaut déjà
+    # False par défaut en local) : à activer en production derrière HTTPS
+    # (ex. Render — voir render.yaml), à laisser désactivé en local sous
+    # http:// sous peine de perdre la session juste après connexion.
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    SESSION_COOKIE_SECURE = not DEBUG
+    SESSION_COOKIE_SECURE = (os.getenv('SESSION_COOKIE_SECURE', 'False') == 'True')
 
     # Database — SQLite en local par défaut, surchargeable via DATABASE_URL
     # (ex. Postgres en production).
