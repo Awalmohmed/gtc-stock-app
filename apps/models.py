@@ -22,7 +22,10 @@ class Utilisateur(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     nom = db.Column(db.String(150), nullable=False)
-    identifiant = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    # collation="NOCASE" : "j.dupont" et "J.Dupont" sont traités comme le
+    # même identifiant par SQLite (comparaisons, index unique, tri) — évite
+    # les doublons de casse et rend la connexion insensible à la casse.
+    identifiant = db.Column(db.String(80, collation="NOCASE"), unique=True, nullable=False, index=True)
     mot_de_passe_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(50), nullable=False)
     actif = db.Column(db.Boolean, nullable=False, default=True)

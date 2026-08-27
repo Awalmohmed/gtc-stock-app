@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.exc import IntegrityError
 
-from apps import db
+from apps import app, db
 from apps.models import TentativeConnexion
 
 MAX_ECHECS = 5
@@ -61,7 +61,14 @@ def enregistrer_echec(cle, _essais_restants=2):
     except IntegrityError:
         db.session.rollback()
         if _essais_restants <= 0:
-            raise
+            # Best-effort : sous trafic très concurrent, on préfère perdre le
+            # comptage de cette tentative plutôt que de faire échouer (500)
+            # toute la page de connexion pour un simple souci de bookkeeping.
+            app.logger.warning(
+                "rate_limit: abandon de l'enregistrement pour %r après "
+                "plusieurs collisions concurrentes", cle
+            )
+            return
         enregistrer_echec(cle, _essais_restants=_essais_restants - 1)
 
 

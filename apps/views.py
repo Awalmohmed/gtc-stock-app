@@ -122,6 +122,10 @@ def accounts_sign_in():
       reinitialiser(cle_identifiant)
       reinitialiser(cle_ip)
       session.clear()
+      # "Se souvenir de moi" : session persistante (durée définie par
+      # PERMANENT_SESSION_LIFETIME, 31 jours par défaut chez Flask) au lieu
+      # d'expirer à la fermeture du navigateur.
+      session.permanent = bool(request.form.get('remember'))
       session['identifiant'] = user.identifiant
       session['nom'] = user.nom
       session['role'] = user.role

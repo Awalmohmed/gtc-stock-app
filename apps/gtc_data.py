@@ -14,6 +14,7 @@ table "utilisateurs".
 from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from apps import db
 from apps.models import Utilisateur
@@ -217,15 +218,24 @@ def get_user_by_identifiant(identifiant):
     return Utilisateur.query.filter_by(identifiant=identifiant).first()
 
 
+# Hash factice utilisé quand l'identifiant est inconnu, pour que
+# check_password_hash() soit systématiquement exécuté (même coût CPU)
+# côté serveur — évite qu'un attaquant déduise par le temps de réponse
+# si un identifiant existe (énumération de comptes).
+_HASH_FACTICE = generate_password_hash("mot-de-passe-factice-temps-constant")
+
+
 def verify_credentials(identifiant, mot_de_passe):
     """Vérifie identifiant/mot de passe. Retourne l'utilisateur si valide
     et actif, sinon None (compte inconnu, désactivé ou mot de passe faux).
     Met à jour la date de dernière connexion en cas de succès."""
     user = get_user_by_identifiant(identifiant)
-    if not user or not user.actif:
+    hash_a_verifier = user.mot_de_passe_hash if user else _HASH_FACTICE
+    mot_de_passe_valide = check_password_hash(hash_a_verifier, mot_de_passe)
+
+    if not user or not user.actif or not mot_de_passe_valide:
         return None
-    if not user.check_password(mot_de_passe):
-        return None
+
     user.derniere_connexion = datetime.now().strftime("%d/%m/%Y — %H:%M")
     db.session.commit()
     return user
