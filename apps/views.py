@@ -10,8 +10,8 @@ from jinja2  import TemplateNotFound
 # App modules
 from apps import app
 from apps.gtc_data import (
-  ARTICLES, MOUVEMENTS, RAPPROCHEMENT, ALERTES,
-  get_stats, get_article, get_historique, get_all_users,
+  ARTICLES, MOUVEMENTS, ALERTES,
+  get_stats, get_article, get_historique, get_all_users, get_rapprochement,
   verify_credentials, add_user, get_user_by_identifiant,
 )
 from apps.models import ROLE_CLASSES
@@ -49,8 +49,9 @@ def pages_fiche_stock():
 @app.route('/pages/rapprochement/')
 @login_required
 def pages_rapprochement():
+  rapprochement, sage_connecte, erreur_sage = get_rapprochement()
   return render_template('pages/rapprochement.html', segment='rapprochement', parent='pages',
-                          rapprochement=RAPPROCHEMENT)
+                          rapprochement=rapprochement, sage_connecte=sage_connecte, erreur_sage=erreur_sage)
 
 @app.route('/pages/alertes/')
 @login_required

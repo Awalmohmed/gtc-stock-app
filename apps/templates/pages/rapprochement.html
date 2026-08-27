@@ -9,13 +9,26 @@
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
       <h6 class="mb-1"><i class="bi bi-diagram-3 text-primary"></i> Connexion Sage 100</h6>
-      <span class="text-muted small">Lecture seule — dernière synchronisation : 24/08/2026 à 07:12</span>
+      {% if sage_connecte %}
+      <span class="text-muted small">Lecture seule — quantités lues en direct depuis Sage 100</span>
+      {% elif erreur_sage %}
+      <span class="text-danger small">Échec de connexion à Sage 100 — données de démonstration affichées ci-dessous</span>
+      {% else %}
+      <span class="text-muted small">Connexion Sage 100 non configurée — données de démonstration affichées ci-dessous</span>
+      {% endif %}
     </div>
     <div class="d-flex align-items-center gap-2">
+      {% if sage_connecte %}
       <span class="badge bg-success-subtle text-success"><i class="bi bi-plug-fill"></i> Connecté</span>
+      {% else %}
+      <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-plug"></i> Non connecté</span>
+      {% endif %}
       <button class="btn btn-primary btn-sm"><i class="bi bi-arrow-repeat"></i> Lancer un rapprochement</button>
     </div>
   </div>
+  {% if erreur_sage %}
+  <div class="alert alert-danger mt-3 mb-0 py-2 small"><i class="bi bi-exclamation-triangle"></i> {{ erreur_sage }}</div>
+  {% endif %}
 </div>
 
 <div class="card table-card p-3">

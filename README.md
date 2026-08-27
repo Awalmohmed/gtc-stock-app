@@ -115,6 +115,51 @@ At this point, the app runs at `http://127.0.0.1:5000/`.
 
 <br />
 
+## Rapprochement Sage 100
+
+La page `/pages/rapprochement/` compare les quantités en stock de l'app à
+celles de Sage 100. Par défaut, **aucune connexion réelle n'est
+configurée** : la page affiche des données de démonstration avec un
+bandeau explicite ("Connexion Sage 100 non configurée").
+
+Pour brancher une vraie base Sage 100 en lecture seule (voir
+`apps/sage_connector.py`), définir deux variables d'environnement :
+
+- `SAGE_DB_CONNECTION_STRING` — chaîne de connexion ODBC complète, ex.
+  `DRIVER={ODBC Driver 17 for SQL Server};SERVER=...;DATABASE=...;UID=...;PWD=...;`
+  (ou un DSN déjà déclaré sur le serveur : `DSN=Sage100;UID=...;PWD=...`).
+  Fonctionne aussi bien avec Sage 100cloud (SQL Server) qu'avec Sage 100
+  Pervasive/Actian PSQL — c'est le driver ODBC installé sur le serveur qui
+  détermine le moteur réellement contacté.
+- `SAGE_STOCK_QUERY` — requête SQL à adapter au schéma réel de la base
+  Sage 100 de l'entreprise (à obtenir auprès de l'administrateur Sage),
+  qui doit retourner exactement 2 colonnes : référence article, quantité.
+
+`pyodbc` est déjà dans `requirements.txt`, mais le driver ODBC système
+correspondant à l'édition Sage 100 utilisée (ODBC Driver for SQL Server,
+ou driver Actian/Pervasive PSQL) doit être installé séparément sur le
+serveur — non fourni par ce dépôt, spécifique à chaque environnement.
+
+<br />
+
+## Déploiement Docker & persistance des données
+
+`docker-compose.yml` stocke le fichier SQLite dans un volume Docker
+nommé (`gtc_stock_data`), pour qu'il survive aux `docker-compose up
+--build` et redémarrages de conteneur. Les migrations (`flask db
+upgrade`) s'exécutent automatiquement au démarrage du conteneur (voir
+`docker-entrypoint.sh`).
+
+Pour un déploiement réel (pas juste un essai local), définir dans un
+fichier `.env` à la racine avant `docker-compose up` :
+
+```bash
+SECRET_KEY=une-valeur-longue-et-aleatoire
+SESSION_COOKIE_SECURE=True   # si nginx/le reverse-proxy sert l'app en HTTPS
+```
+
+<br />
+
 ## Codebase Structure
 
 The project has a simple, intuitive structure presented bellow:

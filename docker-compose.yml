@@ -4,6 +4,18 @@ services:
     container_name: appseed_app
     restart: always
     build: .
+    environment:
+      # Fichier SQLite stocké dans le volume nommé ci-dessous, pour
+      # survivre aux rebuilds/redémarrages du conteneur — sans ça,
+      # `docker-compose up --build` efface toute la base à chaque fois.
+      - DATABASE_URL=sqlite:////data/gtc_stock.sqlite3
+      # SECRET_KEY et SESSION_COOKIE_SECURE : à définir via un fichier
+      # .env à la racine pour un déploiement réel (voir README) — les
+      # valeurs par défaut ci-dessous conviennent seulement en local.
+      - SECRET_KEY=${SECRET_KEY:-S#perS3crEt_9999}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-False}
+    volumes:
+      - gtc_stock_data:/data
     networks:
       - db_network
       - web_network
@@ -24,4 +36,6 @@ networks:
     driver: bridge
   web_network:
     driver: bridge
- 
+
+volumes:
+  gtc_stock_data:

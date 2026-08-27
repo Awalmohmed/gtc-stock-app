@@ -18,6 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from apps import db
 from apps.models import Utilisateur
+from apps import sage_connector
 
 # ---------------------------------------------------------------------
 # Articles suivis en stock
@@ -125,6 +126,10 @@ HISTORIQUE = {
 
 # ---------------------------------------------------------------------
 # Rapprochement automatique avec Sage 100
+#
+# Données de démonstration, utilisées tant que la connexion Sage 100 en
+# base réelle (voir apps/sage_connector.py) n'est pas configurée — voir
+# get_rapprochement() ci-dessous, appelée par la page /pages/rapprochement/.
 # ---------------------------------------------------------------------
 RAPPROCHEMENT = [
     {"article": "Rame de papier A4", "qte_app": 5, "qte_sage": 5, "ecart": 0, "conforme": True},
@@ -201,6 +206,40 @@ def get_article(article_id):
         if article["id"] == article_id:
             return article
     return None
+
+
+def get_rapprochement():
+    """Lignes de rapprochement stock application / Sage 100.
+
+    Retourne (lignes, sage_connecte, erreur) :
+      - si la connexion Sage 100 est configurée et fonctionne, compare en
+        direct les quantités Sage aux quantités internes (sage_connecte=True) ;
+      - sinon (non configurée, ou échec de connexion/requête), retourne
+        les données de démonstration RAPPROCHEMENT (sage_connecte=False),
+        avec le détail de l'erreur le cas échéant pour l'afficher à
+        l'utilisateur plutôt que de masquer le problème."""
+    if not sage_connector.is_configured():
+        return RAPPROCHEMENT, False, None
+
+    try:
+        quantites_sage = sage_connector.get_quantites_sage()
+    except sage_connector.SageConnectorError as e:
+        return RAPPROCHEMENT, False, str(e)
+
+    lignes = []
+    for article in ARTICLES:
+        qte_sage = quantites_sage.get(article["reference"])
+        if qte_sage is None:
+            continue  # article absent de la base Sage : pas de comparaison possible
+        ecart = article["quantite"] - qte_sage
+        lignes.append({
+            "article": article["nom"],
+            "qte_app": article["quantite"],
+            "qte_sage": qte_sage,
+            "ecart": ecart,
+            "conforme": ecart == 0,
+        })
+    return lignes, True, None
 
 
 def get_historique(article_id):
