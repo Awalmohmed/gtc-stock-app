@@ -10,15 +10,15 @@ from flask   import render_template, request, redirect, url_for, session, flash,
 from jinja2  import TemplateNotFound
 
 # App modules
-from apps import app
+from apps import app, db
 from apps.gtc_data import (
-  ALERTES,
   get_stats, get_all_articles, get_article, get_historique, get_mouvements,
   add_entree, add_sortie, get_all_users, get_rapprochement,
-  get_all_fournisseurs, add_fournisseur, get_journal,
+  get_all_fournisseurs, add_fournisseur, get_journal, get_alertes,
+  get_all_magasins,
   verify_credentials, add_user, get_user_by_identifiant,
 )
-from apps.models import ROLE_CLASSES
+from apps.models import ROLE_CLASSES, Magasin, ROLES_TOUS_MAGASINS
 from apps.auth import login_required, admin_required, is_safe_next_url
 from apps.rate_limit import secondes_avant_deblocage, enregistrer_echec, reinitialiser
 from apps.import_articles import importer_fichier, modele_csv, FichierInvalide
@@ -28,6 +28,38 @@ from apps import exports
 @app.route('/')
 def index():
   return redirect(url_for('pages_dashboard'))
+
+
+@app.context_processor
+def injecter_selecteur_magasin():
+  """Alimente le sélecteur de magasin de la barre supérieure — visible
+  uniquement pour les rôles qui voient tous les magasins (Administrateur,
+  Comptable ; voir ROLES_TOUS_MAGASINS). Pour un Gestionnaire de stock,
+  rien n'est injecté : il est lié à un seul magasin, sans choix possible."""
+  if session.get('role') not in ROLES_TOUS_MAGASINS:
+    return {}
+  return {
+    'magasins_selecteur': get_all_magasins(),
+    'magasin_filtre_actif': session.get('magasin_filtre'),
+  }
+
+
+@app.route('/pages/magasin-filtre', methods=['POST'])
+@login_required
+def definir_magasin_filtre():
+  """Enregistre (ou efface) le magasin choisi dans le sélecteur de la
+  barre supérieure. Réservé aux rôles qui voient tous les magasins ;
+  pour les autres, le périmètre est imposé par leur rattachement."""
+  if session.get('role') in ROLES_TOUS_MAGASINS:
+    magasin_id = request.form.get('magasin_id', type=int)
+    if magasin_id and db.session.get(Magasin, magasin_id):
+      session['magasin_filtre'] = magasin_id
+    else:
+      session.pop('magasin_filtre', None)
+  retour = request.form.get('retour')
+  if not is_safe_next_url(retour):
+    retour = url_for('pages_dashboard')
+  return redirect(retour)
 
 # Pages -- Dashboard
 @app.route('/pages/dashboard/')
@@ -214,7 +246,7 @@ def export_rapprochement_excel():
 @login_required
 def pages_alertes():
   return render_template('pages/alertes.html', segment='alertes', parent='pages',
-                          alertes=ALERTES)
+                          alertes=get_alertes())
 
 @app.route('/pages/utilisateurs/')
 @login_required

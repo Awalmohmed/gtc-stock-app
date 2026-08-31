@@ -11,12 +11,81 @@ apps/models.py et apps/config.py).
 
 from datetime import datetime
 
+from flask import session
+from sqlalchemy import false as sa_false
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from apps import db
-from apps.models import Utilisateur, Article, Entree, Sortie, Fournisseur, JournalActivite
+from apps.models import (
+    Utilisateur, Article, Entree, Sortie, Fournisseur, JournalActivite,
+    Magasin, ROLES_TOUS_MAGASINS,
+)
 from apps import sage_connector
+
+
+# ---------------------------------------------------------------------
+# Filtrage par magasin (multi-magasin)
+#
+# Un "Gestionnaire de stock" est rattaché à un magasin (Utilisateur.
+# magasin_id) et ne voit que les articles de ce magasin. Un
+# "Administrateur" ou un "Comptable" (voir ROLES_TOUS_MAGASINS) voit
+# tous les magasins, avec la possibilité d'en sélectionner un via le
+# menu de la barre supérieure — ce choix est mémorisé dans
+# session['magasin_filtre'].
+# ---------------------------------------------------------------------
+
+
+def _utilisateur_courant():
+    """L'objet Utilisateur de la session courante, ou None hors session
+    (ex. page de connexion)."""
+    identifiant = session.get('identifiant')
+    return get_user_by_identifiant(identifiant) if identifiant else None
+
+
+def _scope_magasin():
+    """Périmètre d'affichage courant, sous la forme (mode, magasin_id) :
+      - ("tous", None)    : aucun filtre (admin/comptable sans sélection,
+                            ou hors session) ;
+      - ("magasin", <id>) : restreint à ce magasin (gestionnaire de
+                            stock, ou admin/comptable ayant choisi un
+                            magasin dans le menu) ;
+      - ("aucun", None)   : rien de visible — gestionnaire de stock sans
+                            magasin rattaché (à corriger par un admin).
+    """
+    user = _utilisateur_courant()
+    if user is None:
+        return ("tous", None)
+    if user.role in ROLES_TOUS_MAGASINS:
+        choisi = session.get('magasin_filtre')
+        return ("magasin", int(choisi)) if choisi else ("tous", None)
+    return ("magasin", user.magasin_id) if user.magasin_id else ("aucun", None)
+
+
+def _filtrer_articles(query):
+    """Restreint une requête sur Article au périmètre magasin courant."""
+    mode, magasin_id = _scope_magasin()
+    if mode == "magasin":
+        return query.filter(Article.magasin_id == magasin_id)
+    if mode == "aucun":
+        return query.filter(sa_false())
+    return query
+
+
+def _article_visible(article):
+    """True si `article` est dans le périmètre magasin courant."""
+    mode, magasin_id = _scope_magasin()
+    if mode == "tous":
+        return True
+    if mode == "magasin":
+        return article.magasin_id == magasin_id
+    return False
+
+
+def get_all_magasins():
+    """Tous les magasins, triés par nom (pour le menu de filtre et la
+    page de gestion des magasins)."""
+    return Magasin.query.order_by(Magasin.nom).all()
 
 
 def _journaliser(utilisateur, action, description):
@@ -125,8 +194,9 @@ ALERTES = [
 
 
 def get_stats():
-    """Chiffres agrégés pour les cartes du tableau de bord."""
-    articles = Article.query.all()
+    """Chiffres agrégés pour les cartes du tableau de bord (limités au
+    magasin courant — voir _scope_magasin)."""
+    articles = _filtrer_articles(Article.query).all()
     return {
         "total_articles": len(articles),
         "alertes": sum(1 for a in articles if a.statut_classe == "alerte"),
@@ -136,15 +206,22 @@ def get_stats():
 
 
 def get_all_articles():
-    """Retourne tous les articles, triés par nom."""
-    return Article.query.order_by(Article.nom).all()
+    """Retourne les articles du magasin courant, triés par nom (voir
+    _scope_magasin pour la règle de visibilité selon le rôle)."""
+    return _filtrer_articles(Article.query).order_by(Article.nom).all()
 
 
 def get_article(article_id):
-    """Retourne l'article correspondant à l'id, ou None si absent/invalide."""
+    """Retourne l'article correspondant à l'id, ou None si absent,
+    invalide, ou hors du périmètre magasin de l'utilisateur courant.
+    Ce dernier cas sert aussi de garde-fou aux saisies d'entrée/sortie
+    (add_entree/add_sortie passent par ici)."""
     if not article_id:
         return None
-    return db.session.get(Article, article_id)
+    article = db.session.get(Article, article_id)
+    if article is None or not _article_visible(article):
+        return None
+    return article
 
 
 def get_rapprochement():
@@ -158,12 +235,12 @@ def get_rapprochement():
         avec le détail de l'erreur le cas échéant pour l'afficher à
         l'utilisateur plutôt que de masquer le problème."""
     if not sage_connector.is_configured():
-        return RAPPROCHEMENT, False, None
+        return _lignes_demo_visibles(RAPPROCHEMENT, lambda l: l["article"]), False, None
 
     try:
         quantites_sage = sage_connector.get_quantites_sage()
     except sage_connector.SageConnectorError as e:
-        return RAPPROCHEMENT, False, str(e)
+        return _lignes_demo_visibles(RAPPROCHEMENT, lambda l: l["article"]), False, str(e)
 
     lignes = []
     for article in get_all_articles():
@@ -179,6 +256,31 @@ def get_rapprochement():
             "conforme": ecart == 0,
         })
     return lignes, True, None
+
+
+def _lignes_demo_visibles(lignes, nom_article):
+    """Filtre une liste de dictionnaires de démonstration (RAPPROCHEMENT,
+    ALERTES) sur le magasin courant, au mieux : une ligne est conservée
+    si le nom d'article qu'elle mentionne (extrait par `nom_article`,
+    qui peut renvoyer le nom exact ou un libellé qui le contient)
+    correspond à un article visible. `lignes` est renvoyée telle quelle
+    quand aucun filtre n'est actif (admin/comptable sans sélection)."""
+    mode, _magasin_id = _scope_magasin()
+    if mode == "tous":
+        return lignes
+    noms_visibles = {a.nom for a in get_all_articles()}
+    return [
+        ligne for ligne in lignes
+        if any(nom in nom_article(ligne) for nom in noms_visibles)
+    ]
+
+
+def get_alertes():
+    """Alertes de démonstration limitées au magasin courant (voir
+    _lignes_demo_visibles). Les alertes en dur ne sont pas encore
+    rattachées à un magasin en base : le rapprochement se fait sur le
+    nom d'article cité dans le titre."""
+    return _lignes_demo_visibles(ALERTES, lambda al: al["titre"])
 
 
 def _mouvement_vers_dict(mouvement, type_libelle, signe):
@@ -199,10 +301,12 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
 
 
 def get_mouvements():
-    """Tous les mouvements (entrées + sorties), tous articles confondus,
+    """Mouvements (entrées + sorties) des articles du magasin courant,
     du plus récent au plus ancien — pour la page Entrées/Sorties."""
-    lignes = [_mouvement_vers_dict(e, "Entrée", "+") for e in Entree.query.all()]
-    lignes += [_mouvement_vers_dict(s, "Sortie", "-") for s in Sortie.query.all()]
+    entrees = _filtrer_articles(Entree.query.join(Article)).all()
+    sorties = _filtrer_articles(Sortie.query.join(Article)).all()
+    lignes = [_mouvement_vers_dict(e, "Entrée", "+") for e in entrees]
+    lignes += [_mouvement_vers_dict(s, "Sortie", "-") for s in sorties]
     lignes.sort(key=lambda m: (m["date_tri"], m["id_tri"]), reverse=True)
     return lignes
 
