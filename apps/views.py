@@ -4,14 +4,17 @@ Copyright (c) 2019 - present AppSeed.us
 """
 
 # Flask modules
+from datetime import datetime
+
 from flask   import render_template, request, redirect, url_for, session, flash
 from jinja2  import TemplateNotFound
 
 # App modules
 from apps import app
 from apps.gtc_data import (
-  ARTICLES, MOUVEMENTS, ALERTES,
-  get_stats, get_article, get_historique, get_all_users, get_rapprochement,
+  ALERTES,
+  get_stats, get_all_articles, get_article, get_historique, get_mouvements,
+  add_entree, add_sortie, get_all_users, get_rapprochement,
   verify_credentials, add_user, get_user_by_identifiant,
 )
 from apps.models import ROLE_CLASSES
@@ -28,7 +31,7 @@ def index():
 @login_required
 def pages_dashboard():
   return render_template('pages/dashboard/dashboard.html', segment='dashboard', parent='pages',
-                          stats=get_stats(), articles=ARTICLES)
+                          stats=get_stats(), articles=get_all_articles())
 
 # Pages -- GTC Stock
 
@@ -36,15 +39,63 @@ def pages_dashboard():
 @login_required
 def pages_entrees_sorties():
   return render_template('pages/entrees_sorties.html', segment='entrees_sorties', parent='pages',
-                          articles=ARTICLES, mouvements=MOUVEMENTS)
+                          articles=get_all_articles(), mouvements=get_mouvements())
+
+def _parser_date_formulaire(valeur):
+  """Convertit la date d'un <input type="date"> (format AAAA-MM-JJ) en
+  objet date Python. Lève ValueError (message utilisateur) si absente/invalide."""
+  try:
+    return datetime.strptime(valeur, '%Y-%m-%d').date()
+  except (TypeError, ValueError):
+    raise ValueError("Merci d'indiquer une date valide.")
+
+@app.route('/pages/entrees-sorties/nouvelle-entree', methods=['POST'])
+@login_required
+def creer_entree():
+  utilisateur = get_user_by_identifiant(session.get('identifiant'))
+  try:
+    article_id = request.form.get('article_id', type=int)
+    quantite = request.form.get('quantite', type=int)
+    date_mouvement = _parser_date_formulaire(request.form.get('date') or '')
+    fournisseur = (request.form.get('fournisseur') or '').strip()
+    reference = (request.form.get('reference') or '').strip()
+    if quantite is None:
+      raise ValueError("Merci d'indiquer une quantité valide.")
+    add_entree(article_id, date_mouvement, quantite, fournisseur, reference, utilisateur)
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_entrees_sorties'))
+  flash("Entrée de stock enregistrée avec succès.", 'success')
+  return redirect(url_for('pages_entrees_sorties'))
+
+@app.route('/pages/entrees-sorties/nouvelle-sortie', methods=['POST'])
+@login_required
+def creer_sortie():
+  utilisateur = get_user_by_identifiant(session.get('identifiant'))
+  try:
+    article_id = request.form.get('article_id', type=int)
+    quantite = request.form.get('quantite', type=int)
+    date_mouvement = _parser_date_formulaire(request.form.get('date') or '')
+    type_document = (request.form.get('type_document') or '').strip()
+    reference = (request.form.get('reference') or '').strip()
+    if quantite is None:
+      raise ValueError("Merci d'indiquer une quantité valide.")
+    add_sortie(article_id, date_mouvement, quantite, type_document, reference, utilisateur)
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_entrees_sorties'))
+  flash("Sortie de stock enregistrée avec succès.", 'success')
+  return redirect(url_for('pages_entrees_sorties'))
 
 @app.route('/pages/fiche-stock/')
 @login_required
 def pages_fiche_stock():
+  articles = get_all_articles()
   article_id = request.args.get('article', type=int)
-  article = get_article(article_id) or ARTICLES[0]
+  article = get_article(article_id) or (articles[0] if articles else None)
+  historique = get_historique(article.id) if article else []
   return render_template('pages/fiche_stock.html', segment='fiche_stock', parent='pages',
-                          articles=ARTICLES, article=article, historique=get_historique(article['id']))
+                          articles=articles, article=article, historique=historique)
 
 @app.route('/pages/rapprochement/')
 @login_required

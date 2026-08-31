@@ -10,33 +10,34 @@
   <div class="col-md-6">
     <div class="card table-card p-3 h-100">
       <h6 class="mb-3"><i class="bi bi-box-arrow-in-down text-success"></i> Nouvelle entrée</h6>
-      <form data-validate novalidate>
+      <form action="{{ url_for('creer_entree') }}" method="post" data-validate novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-2">
           <label class="form-label small fw-semibold">Article</label>
-          <select class="form-select" required>
+          <select class="form-select" name="article_id" required>
             <option value="" selected disabled>Sélectionner un article</option>
             {% for a in articles %}
-            <option>{{ a.nom }} — {{ a.reference }}</option>
+            <option value="{{ a.id }}">{{ a.nom }} — {{ a.reference }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="row">
           <div class="col-6 mb-2">
             <label class="form-label small fw-semibold">Quantité</label>
-            <input type="number" min="1" class="form-control" placeholder="0" required>
+            <input type="number" name="quantite" min="1" class="form-control" placeholder="0" required>
           </div>
           <div class="col-6 mb-2">
             <label class="form-label small fw-semibold">Date</label>
-            <input type="date" class="form-control" required>
+            <input type="date" name="date" class="form-control" required>
           </div>
         </div>
         <div class="mb-2">
           <label class="form-label small fw-semibold">Fournisseur</label>
-          <input type="text" class="form-control" placeholder="Nom du fournisseur" required>
+          <input type="text" name="fournisseur" class="form-control" placeholder="Nom du fournisseur" required>
         </div>
         <div class="mb-3">
           <label class="form-label small fw-semibold">N° bordereau de réception</label>
-          <input type="text" class="form-control" placeholder="ex : BR-2026-0143" required>
+          <input type="text" name="reference" class="form-control" placeholder="ex : BR-2026-0143" required>
         </div>
         <button type="submit" class="btn btn-success w-100 fw-semibold">Enregistrer l'entrée</button>
       </form>
@@ -47,29 +48,30 @@
   <div class="col-md-6">
     <div class="card table-card p-3 h-100">
       <h6 class="mb-3"><i class="bi bi-box-arrow-up text-danger"></i> Nouvelle sortie</h6>
-      <form data-validate novalidate>
+      <form action="{{ url_for('creer_sortie') }}" method="post" data-validate novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-2">
           <label class="form-label small fw-semibold">Article</label>
-          <select class="form-select" required>
+          <select class="form-select" name="article_id" required>
             <option value="" selected disabled>Sélectionner un article</option>
             {% for a in articles %}
-            <option>{{ a.nom }} — {{ a.reference }}</option>
+            <option value="{{ a.id }}">{{ a.nom }} — {{ a.reference }} (stock : {{ a.quantite }})</option>
             {% endfor %}
           </select>
         </div>
         <div class="row">
           <div class="col-6 mb-2">
             <label class="form-label small fw-semibold">Quantité</label>
-            <input type="number" min="1" class="form-control" placeholder="0" required>
+            <input type="number" name="quantite" min="1" class="form-control" placeholder="0" required>
           </div>
           <div class="col-6 mb-2">
             <label class="form-label small fw-semibold">Date</label>
-            <input type="date" class="form-control" required>
+            <input type="date" name="date" class="form-control" required>
           </div>
         </div>
         <div class="mb-2">
           <label class="form-label small fw-semibold">Justificatif</label>
-          <select class="form-select" required>
+          <select class="form-select" name="type_document" required>
             <option value="" selected disabled>Type de document</option>
             <option>Bon de livraison</option>
             <option>Bordereau de route</option>
@@ -77,7 +79,7 @@
         </div>
         <div class="mb-3">
           <label class="form-label small fw-semibold">N° du document</label>
-          <input type="text" class="form-control" placeholder="ex : BL-2026-0087" required>
+          <input type="text" name="reference" class="form-control" placeholder="ex : BL-2026-0087" required>
         </div>
         <button type="submit" class="btn btn-danger w-100 fw-semibold">Enregistrer la sortie</button>
       </form>

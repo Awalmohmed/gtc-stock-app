@@ -74,3 +74,99 @@ class TentativeConnexion(db.Model):
 
     def __repr__(self):
         return f"<TentativeConnexion {self.cle} echecs={self.echecs}>"
+
+
+class Fournisseur(db.Model):
+    """Fournisseur associé aux entrées de stock.
+
+    Étape 1 : table créée mais pas encore reliée aux entrées (voir
+    Entree.fournisseur, encore un champ texte libre). Le lien réel
+    (menu déroulant + page de gestion) arrive dans une étape suivante."""
+
+    __tablename__ = "fournisseurs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(150), unique=True, nullable=False, index=True)
+    contact = db.Column(db.String(150), nullable=True)
+
+    def __repr__(self):
+        return f"<Fournisseur {self.nom}>"
+
+
+class Article(db.Model):
+    """Article suivi en stock."""
+
+    __tablename__ = "articles"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(150), nullable=False)
+    reference = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    quantite = db.Column(db.Integer, nullable=False, default=0)
+    seuil = db.Column(db.Integer, nullable=False, default=0)
+    # "Alerte" / "OK" / "Dormant" — mis à jour automatiquement (Alerte/OK)
+    # à chaque nouveau mouvement selon quantite vs seuil ; "Dormant" reste
+    # tel quel tant qu'aucun mouvement ne survient sur l'article.
+    statut = db.Column(db.String(20), nullable=False, default="OK")
+    # Dernière quantité connue côté Sage 100, pour le calcul de l'écart
+    # (voir la propriété ecart) — alimenté par le rapprochement Sage 100,
+    # pas encore automatique (voir apps/sage_connector.py).
+    sage_quantite = db.Column(db.Integer, nullable=True)
+    dernier_mouvement = db.Column(db.String(20), nullable=True, default="—")
+
+    entrees = db.relationship("Entree", backref="article", lazy="dynamic")
+    sorties = db.relationship("Sortie", backref="article", lazy="dynamic")
+
+    def __repr__(self):
+        return f"<Article {self.reference}>"
+
+    @property
+    def statut_classe(self):
+        """Classe CSS du badge de statut ('alerte' / 'ok' / 'dormant')."""
+        return self.statut.lower()
+
+    @property
+    def ecart(self):
+        """Écart quantité application / Sage 100 (0 si Sage inconnu)."""
+        if self.sage_quantite is None:
+            return 0
+        return self.quantite - self.sage_quantite
+
+
+class Entree(db.Model):
+    """Entrée de stock (réception fournisseur)."""
+
+    __tablename__ = "entrees"
+
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    quantite = db.Column(db.Integer, nullable=False)
+    # Texte libre pour l'instant (voir Fournisseur ci-dessus) — deviendra
+    # une vraie relation (fournisseur_id) dans une étape suivante.
+    fournisseur = db.Column(db.String(150), nullable=True)
+    reference = db.Column(db.String(50), nullable=True)
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
+
+    utilisateur = db.relationship("Utilisateur")
+
+    def __repr__(self):
+        return f"<Entree article={self.article_id} +{self.quantite}>"
+
+
+class Sortie(db.Model):
+    """Sortie de stock (livraison/consommation)."""
+
+    __tablename__ = "sorties"
+
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    quantite = db.Column(db.Integer, nullable=False)
+    type_document = db.Column(db.String(50), nullable=True)
+    reference = db.Column(db.String(50), nullable=True)
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
+
+    utilisateur = db.relationship("Utilisateur")
+
+    def __repr__(self):
+        return f"<Sortie article={self.article_id} -{self.quantite}>"
