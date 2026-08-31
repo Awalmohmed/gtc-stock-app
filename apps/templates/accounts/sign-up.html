@@ -55,6 +55,20 @@
         <div class="form-text">Le rôle détermine les pages et actions accessibles une fois connecté.</div>
       </div>
 
+      <div class="mb-3" id="reg-magasin-groupe">
+        <label class="form-label small fw-semibold" for="reg-magasin">Magasin de rattachement</label>
+        <select class="form-select" id="reg-magasin" name="magasin_id">
+          <option value="" selected>Sélectionner un magasin</option>
+          {% for m in magasins %}
+          <option value="{{ m.id }}">{{ m.nom }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">
+          Obligatoire pour un Gestionnaire de stock : il ne verra que les articles de ce magasin.
+          Sans objet pour un Comptable ou un Administrateur (accès à tous les magasins).
+        </div>
+      </div>
+
       <div class="row">
         <div class="col-6 mb-1">
           <label class="form-label small fw-semibold" for="reg-pwd">Mot de passe</label>
@@ -87,3 +101,25 @@
 </div>
 
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+  // Le magasin de rattachement n'a de sens que pour un Gestionnaire de
+  // stock : on le masque (et on retire l'attribut required) pour les
+  // autres rôles. La validation fait foi côté serveur (voir views.py).
+  (function () {
+    var role = document.getElementById('reg-role');
+    var groupe = document.getElementById('reg-magasin-groupe');
+    var champ = document.getElementById('reg-magasin');
+    if (!role || !groupe || !champ) return;
+    function maj() {
+      var gestionnaire = role.value === 'Gestionnaire de stock';
+      groupe.style.display = gestionnaire ? '' : 'none';
+      champ.required = gestionnaire;
+      if (!gestionnaire) champ.value = '';
+    }
+    role.addEventListener('change', maj);
+    maj();
+  })();
+</script>
+{% endblock extra_js %}

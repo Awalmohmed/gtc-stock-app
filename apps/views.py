@@ -357,6 +357,10 @@ def accounts_sign_in():
 @app.route('/accounts/sign-up/', methods=['GET', 'POST'])
 @admin_required
 def accounts_sign_up():
+  def afficher_formulaire():
+    return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts',
+                            magasins=get_all_magasins())
+
   if request.method == 'POST':
     nom = (request.form.get('nom') or '').strip()
     prenom = (request.form.get('prenom') or '').strip()
@@ -364,12 +368,21 @@ def accounts_sign_up():
     role = request.form.get('role') or ''
     mot_de_passe = request.form.get('mot_de_passe') or ''
     mot_de_passe_confirmation = request.form.get('mot_de_passe_confirmation') or ''
+    magasin_id = request.form.get('magasin_id', type=int)
+
+    # Le magasin de rattachement n'est demandé que pour un Gestionnaire
+    # de stock ; pour un Administrateur ou un Comptable (voir
+    # ROLES_TOUS_MAGASINS), il est ignoré — ces rôles voient tous les
+    # magasins (add_user force alors magasin_id à NULL).
+    magasin_obligatoire = role not in ROLES_TOUS_MAGASINS
 
     erreur = None
     if not (nom and identifiant and role and mot_de_passe):
       erreur = "Merci de renseigner tous les champs obligatoires."
     elif role not in ROLE_CLASSES:
       erreur = "Rôle invalide."
+    elif magasin_obligatoire and not (magasin_id and db.session.get(Magasin, magasin_id)):
+      erreur = "Merci de sélectionner le magasin de rattachement du gestionnaire de stock."
     elif mot_de_passe != mot_de_passe_confirmation:
       erreur = "La confirmation du mot de passe ne correspond pas."
     elif len(mot_de_passe) < 8:
@@ -379,19 +392,20 @@ def accounts_sign_up():
 
     if erreur:
       flash(erreur, "danger")
-      return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts')
+      return afficher_formulaire()
 
     nom_complet = f"{prenom} {nom}".strip()
     admin_actuel = get_user_by_identifiant(session.get('identifiant'))
     try:
-      add_user(nom_complet, identifiant, role, mot_de_passe, cree_par=admin_actuel)
+      add_user(nom_complet, identifiant, role, mot_de_passe,
+               magasin_id=magasin_id, cree_par=admin_actuel)
     except ValueError as e:
       flash(str(e), "danger")
-      return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts')
+      return afficher_formulaire()
     flash(f"Compte « {identifiant} » créé avec succès.", "success")
     return redirect(url_for('pages_utilisateurs'))
 
-  return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts')
+  return afficher_formulaire()
 
 @app.route('/accounts/logout/')
 def accounts_logout():

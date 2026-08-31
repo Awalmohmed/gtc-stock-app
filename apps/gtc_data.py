@@ -484,16 +484,22 @@ def verify_credentials(identifiant, mot_de_passe):
     return user
 
 
-def add_user(nom, identifiant, role, mot_de_passe, cree_par=None):
+def add_user(nom, identifiant, role, mot_de_passe, magasin_id=None, cree_par=None):
     """Crée un nouvel utilisateur en base. Lève ValueError si
     l'identifiant existe déjà (y compris en cas de double soumission
     quasi simultanée : la contrainte d'unicité en base fait foi, pas
-    seulement la vérification préalable). `cree_par` est l'administrateur
-    qui effectue la création (pour le journal d'activité — voir
-    apps/models.py, JournalActivite), pas le nouveau compte lui-même."""
+    seulement la vérification préalable). `magasin_id` n'a de sens que
+    pour un « Gestionnaire de stock » (voir ROLES_TOUS_MAGASINS) ; il
+    est ignoré (laissé à NULL) pour les autres rôles. `cree_par` est
+    l'administrateur qui effectue la création (pour le journal
+    d'activité — voir apps/models.py, JournalActivite), pas le nouveau
+    compte lui-même."""
     if get_user_by_identifiant(identifiant):
         raise ValueError("Cet identifiant existe déjà.")
-    user = Utilisateur(nom=nom, identifiant=identifiant, role=role, actif=True)
+    if role in ROLES_TOUS_MAGASINS:
+        magasin_id = None
+    user = Utilisateur(nom=nom, identifiant=identifiant, role=role, actif=True,
+                       magasin_id=magasin_id)
     user.set_password(mot_de_passe)
     db.session.add(user)
     try:
