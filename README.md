@@ -142,6 +142,46 @@ serveur — non fourni par ce dépôt, spécifique à chaque environnement.
 
 <br />
 
+## Multi-magasin
+
+Chaque `Magasin` (page **Magasins**, réservée à l'Administrateur) regroupe
+des articles et des utilisateurs.
+
+- Un **Gestionnaire de stock** est rattaché à un magasin (choisi à la
+  création du compte) et ne voit / ne mouvemente que les articles de ce
+  magasin, sur toutes les pages.
+- Un **Administrateur** ou un **Comptable** voit tous les magasins ; un
+  sélecteur dans la barre supérieure permet de restreindre l'affichage à
+  un magasin (choix mémorisé en session).
+- Un article ou un gestionnaire sans magasin n'est visible que par un
+  Administrateur, tant que personne ne le lui a rattaché.
+
+<br />
+
+## Alertes de stock par e-mail
+
+Quand une **sortie** fait passer un article à son seuil d'alerte
+(transition vers « Alerte »), un e-mail part vers l'adresse d'alerte du
+**magasin** de l'article (champ éditable sur la page Magasins), ou à
+défaut vers `ALERTE_EMAIL_DEFAUT`. Un seul e-mail par bascule : pas de
+relance tant que l'article reste en alerte.
+
+Par défaut, **aucun serveur SMTP n'est configuré** : l'alerte est alors
+seulement écrite dans les logs applicatifs (l'enregistrement de la sortie
+n'échoue jamais à cause de l'e-mail). Pour envoyer réellement (voir
+`apps/mailer.py`), définir les variables d'environnement :
+
+- `SMTP_HOST` — serveur SMTP (l'envoi reste désactivé tant qu'il est vide).
+- `SMTP_PORT` — port, `587` par défaut.
+- `SMTP_USER`, `SMTP_PASSWORD` — identifiants SMTP (facultatifs : login
+  seulement si `SMTP_USER` est renseigné).
+- `SMTP_USE_TLS` — `True` par défaut (STARTTLS).
+- `ALERTE_EMAIL_EXPEDITEUR` — adresse d'expéditeur affichée.
+- `ALERTE_EMAIL_DEFAUT` — adresse de repli si le magasin concerné n'a pas
+  d'adresse d'alerte propre.
+
+<br />
+
 ## Déploiement Docker & persistance des données
 
 `docker-compose.yml` stocke le fichier SQLite dans un volume Docker

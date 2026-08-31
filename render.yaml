@@ -25,3 +25,19 @@ services:
         generateValue: true
       - key: SEED_PWD_S_NKOLO
         generateValue: true
+      # E-mails d'alerte de stock (voir README, section « Alertes de stock
+      # par e-mail »). Laisser SMTP_HOST vide désactive l'envoi : les
+      # alertes sont alors seulement journalisées. À renseigner pour un
+      # envoi réel :
+      # - key: SMTP_HOST
+      #   value: smtp.exemple.fr
+      # - key: SMTP_PORT
+      #   value: '587'
+      # - key: SMTP_USER
+      #   sync: false
+      # - key: SMTP_PASSWORD
+      #   sync: false
+      # - key: ALERTE_EMAIL_EXPEDITEUR
+      #   value: alertes-stock@gtc.example
+      # - key: ALERTE_EMAIL_DEFAUT
+      #   value: stock@gtc.example
