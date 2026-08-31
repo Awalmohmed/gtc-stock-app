@@ -109,9 +109,14 @@ class Article(db.Model):
     # pas encore automatique (voir apps/sage_connector.py).
     sage_quantite = db.Column(db.Integer, nullable=True)
     dernier_mouvement = db.Column(db.String(20), nullable=True, default="—")
+    # Fournisseur habituel/par défaut de cet article (catalogue) — distinct
+    # du fournisseur d'une livraison précise (voir Entree.fournisseur_id).
+    # Alimenté notamment par l'import de fichier (apps/import_articles.py).
+    fournisseur_id = db.Column(db.Integer, db.ForeignKey("fournisseurs.id"), nullable=True)
 
     entrees = db.relationship("Entree", backref="article", lazy="dynamic")
     sorties = db.relationship("Sortie", backref="article", lazy="dynamic")
+    fournisseur = db.relationship("Fournisseur")
 
     def __repr__(self):
         return f"<Article {self.reference}>"

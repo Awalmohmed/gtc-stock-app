@@ -36,6 +36,11 @@ class Config(object):
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Taille max d'un fichier envoyé par l'utilisateur (ex. import
+    # d'articles, voir apps/import_articles.py) — évite qu'un fichier
+    # énorme (ou malveillant) sature la mémoire du serveur.
+    MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # 5 Mo
+
     # Rapprochement Sage 100 — lecture seule via ODBC (voir
     # apps/sage_connector.py). Compatible aussi bien Sage 100cloud (SQL
     # Server) que Sage 100 Pervasive/Actian PSQL : c'est le driver ODBC

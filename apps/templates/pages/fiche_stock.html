@@ -5,6 +5,12 @@
 
 {% block content %}
 
+<div class="d-flex justify-content-end mb-3">
+  <a href="{{ url_for('import_articles') }}" class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-file-earmark-arrow-up"></i> Importer des articles (CSV/Excel)
+  </a>
+</div>
+
 <div class="row g-3">
   <!-- Liste des articles -->
   <div class="col-md-4">

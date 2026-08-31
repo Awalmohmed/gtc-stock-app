@@ -6,7 +6,7 @@ Copyright (c) 2019 - present AppSeed.us
 # Flask modules
 from datetime import datetime
 
-from flask   import render_template, request, redirect, url_for, session, flash
+from flask   import render_template, request, redirect, url_for, session, flash, Response
 from jinja2  import TemplateNotFound
 
 # App modules
@@ -21,6 +21,7 @@ from apps.gtc_data import (
 from apps.models import ROLE_CLASSES
 from apps.auth import login_required, admin_required, is_safe_next_url
 from apps.rate_limit import secondes_avant_deblocage, enregistrer_echec, reinitialiser
+from apps.import_articles import importer_fichier, modele_csv, FichierInvalide
 
 # App main route -- redirige vers le tableau de bord GTC Stock
 @app.route('/')
@@ -98,6 +99,42 @@ def pages_fiche_stock():
   historique = get_historique(article.id) if article else []
   return render_template('pages/fiche_stock.html', segment='fiche_stock', parent='pages',
                           articles=articles, article=article, historique=historique)
+
+@app.route('/pages/fiche-stock/import', methods=['GET', 'POST'])
+@login_required
+def import_articles():
+  resultat = None
+  if request.method == 'POST':
+    fichier = request.files.get('fichier')
+    if not fichier or not fichier.filename:
+      flash("Merci de sélectionner un fichier.", 'danger')
+    else:
+      try:
+        resultat = importer_fichier(fichier.filename, fichier.read())
+        if resultat['erreurs']:
+          flash(
+            f"Import terminé avec des erreurs : {resultat['crees']} créé(s), "
+            f"{resultat['maj']} mis à jour, {len(resultat['erreurs'])} ligne(s) rejetée(s).",
+            'warning',
+          )
+        else:
+          flash(
+            f"Import réussi : {resultat['crees']} article(s) créé(s), "
+            f"{resultat['maj']} mis à jour.",
+            'success',
+          )
+      except FichierInvalide as e:
+        flash(str(e), 'danger')
+  return render_template('pages/import_articles.html', segment='fiche_stock', parent='pages',
+                          resultat=resultat)
+
+@app.route('/pages/fiche-stock/import/modele.csv')
+@login_required
+def import_articles_modele():
+  return Response(
+    modele_csv(), mimetype='text/csv',
+    headers={'Content-Disposition': 'attachment; filename="modele_import_articles.csv"'},
+  )
 
 @app.route('/pages/fournisseurs/')
 @login_required
