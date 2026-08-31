@@ -38,11 +38,21 @@
           <h5 class="mb-0">{{ article.nom }}</h5>
           <span class="text-muted small">Référence : {{ article.reference }}</span>
         </div>
-        <span class="badge badge-{{ article.statut_classe }} fs-6">
-          {% if article.statut_classe == 'alerte' %}Alerte — stock sous le seuil
-          {% elif article.statut_classe == 'dormant' %}Dormant — peu de mouvement
-          {% else %}OK — stock conforme{% endif %}
-        </span>
+        <div class="text-end">
+          <span class="badge badge-{{ article.statut_classe }} fs-6 d-block mb-2">
+            {% if article.statut_classe == 'alerte' %}Alerte — stock sous le seuil
+            {% elif article.statut_classe == 'dormant' %}Dormant — peu de mouvement
+            {% else %}OK — stock conforme{% endif %}
+          </span>
+          <div class="btn-group btn-group-sm">
+            <a href="{{ url_for('export_fiche_stock_pdf', article=article.id) }}" class="btn btn-outline-secondary">
+              <i class="bi bi-file-earmark-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('export_fiche_stock_excel', article=article.id) }}" class="btn btn-outline-secondary">
+              <i class="bi bi-file-earmark-excel"></i> Excel
+            </a>
+          </div>
+        </div>
       </div>
 
       <div class="row text-center g-2 mb-4">

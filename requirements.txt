@@ -15,7 +15,11 @@ gunicorn==21.2.0
 python-dotenv==1.0.0
 
 # Import d'articles depuis un fichier Excel (voir apps/import_articles.py)
+# + export Excel (voir apps/exports.py)
 openpyxl==3.1.5
+
+# Export PDF (voir apps/exports.py) — pure Python, pas de dépendance système.
+reportlab==5.0.1
 
 # Rapprochement Sage 100 (voir apps/sage_connector.py) — nécessite aussi le
 # driver ODBC système correspondant à l'édition Sage 100 utilisée

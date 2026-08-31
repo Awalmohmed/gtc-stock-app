@@ -22,6 +22,7 @@ from apps.models import ROLE_CLASSES
 from apps.auth import login_required, admin_required, is_safe_next_url
 from apps.rate_limit import secondes_avant_deblocage, enregistrer_echec, reinitialiser
 from apps.import_articles import importer_fichier, modele_csv, FichierInvalide
+from apps import exports
 
 # App main route -- redirige vers le tableau de bord GTC Stock
 @app.route('/')
@@ -100,6 +101,37 @@ def pages_fiche_stock():
   return render_template('pages/fiche_stock.html', segment='fiche_stock', parent='pages',
                           articles=articles, article=article, historique=historique)
 
+def _article_courant_ou_404():
+  """Article ciblé par ?article=<id> (ou le premier disponible), pour
+  les routes d'export — None si aucun article n'existe en base."""
+  articles = get_all_articles()
+  article_id = request.args.get('article', type=int)
+  return get_article(article_id) or (articles[0] if articles else None)
+
+@app.route('/pages/fiche-stock/export.pdf')
+@login_required
+def export_fiche_stock_pdf():
+  article = _article_courant_ou_404()
+  if not article:
+    flash("Aucun article à exporter.", 'danger')
+    return redirect(url_for('pages_fiche_stock'))
+  contenu = exports.fiche_stock_pdf(article, get_historique(article.id))
+  nom_fichier = f"fiche-stock-{article.reference}.pdf"
+  return Response(contenu, mimetype='application/pdf',
+                   headers={'Content-Disposition': f'attachment; filename="{nom_fichier}"'})
+
+@app.route('/pages/fiche-stock/export.xlsx')
+@login_required
+def export_fiche_stock_excel():
+  article = _article_courant_ou_404()
+  if not article:
+    flash("Aucun article à exporter.", 'danger')
+    return redirect(url_for('pages_fiche_stock'))
+  contenu = exports.fiche_stock_excel(article, get_historique(article.id))
+  nom_fichier = f"fiche-stock-{article.reference}.xlsx"
+  return Response(contenu, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                   headers={'Content-Disposition': f'attachment; filename="{nom_fichier}"'})
+
 @app.route('/pages/fiche-stock/import', methods=['GET', 'POST'])
 @login_required
 def import_articles():
@@ -161,6 +193,22 @@ def pages_rapprochement():
   rapprochement, sage_connecte, erreur_sage = get_rapprochement()
   return render_template('pages/rapprochement.html', segment='rapprochement', parent='pages',
                           rapprochement=rapprochement, sage_connecte=sage_connecte, erreur_sage=erreur_sage)
+
+@app.route('/pages/rapprochement/export.pdf')
+@login_required
+def export_rapprochement_pdf():
+  rapprochement, sage_connecte, _erreur = get_rapprochement()
+  contenu = exports.rapprochement_pdf(rapprochement, sage_connecte)
+  return Response(contenu, mimetype='application/pdf',
+                   headers={'Content-Disposition': 'attachment; filename="rapprochement.pdf"'})
+
+@app.route('/pages/rapprochement/export.xlsx')
+@login_required
+def export_rapprochement_excel():
+  rapprochement, sage_connecte, _erreur = get_rapprochement()
+  contenu = exports.rapprochement_excel(rapprochement, sage_connecte)
+  return Response(contenu, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                   headers={'Content-Disposition': 'attachment; filename="rapprochement.xlsx"'})
 
 @app.route('/pages/alertes/')
 @login_required
