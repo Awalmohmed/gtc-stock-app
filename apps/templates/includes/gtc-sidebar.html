@@ -7,6 +7,9 @@
     <a class="nav-link {% if 'entrees_sorties' in segment %}active{% endif %}" href="{{ url_for('pages_entrees_sorties') }}">
       <i class="bi bi-arrow-down-up me-2"></i> Entrées / Sorties
     </a>
+    <a class="nav-link {% if 'fournisseurs' in segment %}active{% endif %}" href="{{ url_for('pages_fournisseurs') }}">
+      <i class="bi bi-truck me-2"></i> Fournisseurs
+    </a>
     <a class="nav-link {% if 'fiche_stock' in segment %}active{% endif %}" href="{{ url_for('pages_fiche_stock') }}">
       <i class="bi bi-card-list me-2"></i> Fiches de stock
     </a>

@@ -15,6 +15,7 @@ from apps.gtc_data import (
   ALERTES,
   get_stats, get_all_articles, get_article, get_historique, get_mouvements,
   add_entree, add_sortie, get_all_users, get_rapprochement,
+  get_all_fournisseurs, add_fournisseur,
   verify_credentials, add_user, get_user_by_identifiant,
 )
 from apps.models import ROLE_CLASSES
@@ -39,7 +40,8 @@ def pages_dashboard():
 @login_required
 def pages_entrees_sorties():
   return render_template('pages/entrees_sorties.html', segment='entrees_sorties', parent='pages',
-                          articles=get_all_articles(), mouvements=get_mouvements())
+                          articles=get_all_articles(), mouvements=get_mouvements(),
+                          fournisseurs=get_all_fournisseurs())
 
 def _parser_date_formulaire(valeur):
   """Convertit la date d'un <input type="date"> (format AAAA-MM-JJ) en
@@ -57,11 +59,11 @@ def creer_entree():
     article_id = request.form.get('article_id', type=int)
     quantite = request.form.get('quantite', type=int)
     date_mouvement = _parser_date_formulaire(request.form.get('date') or '')
-    fournisseur = (request.form.get('fournisseur') or '').strip()
+    fournisseur_id = request.form.get('fournisseur_id', type=int)
     reference = (request.form.get('reference') or '').strip()
     if quantite is None:
       raise ValueError("Merci d'indiquer une quantité valide.")
-    add_entree(article_id, date_mouvement, quantite, fournisseur, reference, utilisateur)
+    add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, utilisateur)
   except ValueError as e:
     flash(str(e), 'danger')
     return redirect(url_for('pages_entrees_sorties'))
@@ -96,6 +98,25 @@ def pages_fiche_stock():
   historique = get_historique(article.id) if article else []
   return render_template('pages/fiche_stock.html', segment='fiche_stock', parent='pages',
                           articles=articles, article=article, historique=historique)
+
+@app.route('/pages/fournisseurs/')
+@login_required
+def pages_fournisseurs():
+  return render_template('pages/fournisseurs.html', segment='fournisseurs', parent='pages',
+                          fournisseurs=get_all_fournisseurs())
+
+@app.route('/pages/fournisseurs/nouveau', methods=['POST'])
+@login_required
+def creer_fournisseur():
+  nom = request.form.get('nom') or ''
+  contact = request.form.get('contact') or ''
+  try:
+    add_fournisseur(nom, contact)
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_fournisseurs'))
+  flash(f"Fournisseur « {nom.strip()} » ajouté avec succès.", 'success')
+  return redirect(url_for('pages_fournisseurs'))
 
 @app.route('/pages/rapprochement/')
 @login_required

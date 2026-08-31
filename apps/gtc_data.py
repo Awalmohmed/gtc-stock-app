@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from apps import db
-from apps.models import Utilisateur, Article, Entree, Sortie
+from apps.models import Utilisateur, Article, Entree, Sortie, Fournisseur
 from apps import sage_connector
 
 # ---------------------------------------------------------------------
@@ -205,18 +205,48 @@ def get_historique(article_id):
     return lignes
 
 
-def add_entree(article_id, date_mouvement, quantite, fournisseur, reference, utilisateur):
+def get_all_fournisseurs():
+    """Retourne tous les fournisseurs, triés par nom."""
+    return Fournisseur.query.order_by(Fournisseur.nom).all()
+
+
+def add_fournisseur(nom, contact):
+    """Crée un nouveau fournisseur en base. Lève ValueError si ce nom
+    existe déjà (y compris en cas de double soumission quasi simultanée :
+    la contrainte d'unicité en base fait foi, pas seulement la
+    vérification préalable — même précaution que pour add_user)."""
+    nom = (nom or "").strip()
+    if not nom:
+        raise ValueError("Le nom du fournisseur est obligatoire.")
+    if Fournisseur.query.filter_by(nom=nom).first():
+        raise ValueError("Ce fournisseur existe déjà.")
+
+    fournisseur = Fournisseur(nom=nom, contact=(contact or "").strip() or None)
+    db.session.add(fournisseur)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError("Ce fournisseur existe déjà.")
+    return fournisseur
+
+
+def add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, utilisateur):
     """Enregistre une entrée de stock et met à jour l'article. Lève
-    ValueError si l'article est introuvable ou la quantité invalide."""
+    ValueError si l'article ou le fournisseur est introuvable, ou si la
+    quantité est invalide."""
     article = get_article(article_id)
     if not article:
         raise ValueError("Article introuvable.")
     if quantite <= 0:
         raise ValueError("La quantité doit être supérieure à zéro.")
+    fournisseur = db.session.get(Fournisseur, fournisseur_id) if fournisseur_id else None
+    if not fournisseur:
+        raise ValueError("Merci de sélectionner un fournisseur.")
 
     entree = Entree(
         article_id=article.id, date=date_mouvement, quantite=quantite,
-        fournisseur=fournisseur or None, reference=reference or None,
+        fournisseur_id=fournisseur.id, reference=reference or None,
         utilisateur_id=utilisateur.id if utilisateur else None,
     )
     article.quantite += quantite

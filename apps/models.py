@@ -77,11 +77,8 @@ class TentativeConnexion(db.Model):
 
 
 class Fournisseur(db.Model):
-    """Fournisseur associé aux entrées de stock.
-
-    Étape 1 : table créée mais pas encore reliée aux entrées (voir
-    Entree.fournisseur, encore un champ texte libre). Le lien réel
-    (menu déroulant + page de gestion) arrive dans une étape suivante."""
+    """Fournisseur associé aux entrées de stock (voir Entree.fournisseur_id
+    et la page /pages/fournisseurs/)."""
 
     __tablename__ = "fournisseurs"
 
@@ -141,13 +138,12 @@ class Entree(db.Model):
     article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
     date = db.Column(db.Date, nullable=False)
     quantite = db.Column(db.Integer, nullable=False)
-    # Texte libre pour l'instant (voir Fournisseur ci-dessus) — deviendra
-    # une vraie relation (fournisseur_id) dans une étape suivante.
-    fournisseur = db.Column(db.String(150), nullable=True)
+    fournisseur_id = db.Column(db.Integer, db.ForeignKey("fournisseurs.id"), nullable=True)
     reference = db.Column(db.String(50), nullable=True)
     utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
 
     utilisateur = db.relationship("Utilisateur")
+    fournisseur = db.relationship("Fournisseur")
 
     def __repr__(self):
         return f"<Entree article={self.article_id} +{self.quantite}>"

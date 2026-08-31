@@ -33,7 +33,17 @@
         </div>
         <div class="mb-2">
           <label class="form-label small fw-semibold">Fournisseur</label>
-          <input type="text" name="fournisseur" class="form-control" placeholder="Nom du fournisseur" required>
+          <select class="form-select" name="fournisseur_id" required>
+            <option value="" selected disabled>Sélectionner un fournisseur</option>
+            {% for f in fournisseurs %}
+            <option value="{{ f.id }}">{{ f.nom }}</option>
+            {% else %}
+            <option value="" disabled>Aucun fournisseur — ajoutez-en un d'abord</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">
+            <a href="{{ url_for('pages_fournisseurs') }}">Gérer les fournisseurs</a>
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label small fw-semibold">N° bordereau de réception</label>
