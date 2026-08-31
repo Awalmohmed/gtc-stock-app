@@ -15,8 +15,29 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from apps import db
-from apps.models import Utilisateur, Article, Entree, Sortie, Fournisseur
+from apps.models import Utilisateur, Article, Entree, Sortie, Fournisseur, JournalActivite
 from apps import sage_connector
+
+
+def _journaliser(utilisateur, action, description):
+    """Ajoute une ligne au journal d'activité (audit log). N'effectue
+    pas le commit elle-même : appelée juste avant le commit existant de
+    l'action en cours, pour que le journal et l'action restent
+    cohérents (même transaction)."""
+    db.session.add(JournalActivite(
+        horodatage=datetime.now(),
+        utilisateur_id=utilisateur.id if utilisateur else None,
+        identifiant=utilisateur.identifiant if utilisateur else None,
+        action=action, description=description,
+    ))
+
+
+def get_journal():
+    """Toutes les entrées du journal d'activité, de la plus récente à
+    la plus ancienne."""
+    return JournalActivite.query.order_by(
+        JournalActivite.horodatage.desc(), JournalActivite.id.desc()
+    ).all()
 
 # ---------------------------------------------------------------------
 # Articles, entrées et sorties de stock
@@ -254,6 +275,8 @@ def add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, 
     _recalculer_statut(article)
 
     db.session.add(entree)
+    _journaliser(utilisateur, "entree_stock",
+                 f"Entrée de {quantite} sur « {article.nom} » ({article.reference}).")
     db.session.commit()
     return entree
 
@@ -284,6 +307,8 @@ def add_sortie(article_id, date_mouvement, quantite, type_document, reference, u
     _recalculer_statut(article)
 
     db.session.add(sortie)
+    _journaliser(utilisateur, "sortie_stock",
+                 f"Sortie de {quantite} sur « {article.nom} » ({article.reference}).")
     db.session.commit()
     return sortie
 
@@ -317,15 +342,18 @@ def verify_credentials(identifiant, mot_de_passe):
         return None
 
     user.derniere_connexion = datetime.now().strftime("%d/%m/%Y — %H:%M")
+    _journaliser(user, "connexion", f"Connexion réussie de « {user.identifiant} ».")
     db.session.commit()
     return user
 
 
-def add_user(nom, identifiant, role, mot_de_passe):
+def add_user(nom, identifiant, role, mot_de_passe, cree_par=None):
     """Crée un nouvel utilisateur en base. Lève ValueError si
     l'identifiant existe déjà (y compris en cas de double soumission
     quasi simultanée : la contrainte d'unicité en base fait foi, pas
-    seulement la vérification préalable)."""
+    seulement la vérification préalable). `cree_par` est l'administrateur
+    qui effectue la création (pour le journal d'activité — voir
+    apps/models.py, JournalActivite), pas le nouveau compte lui-même."""
     if get_user_by_identifiant(identifiant):
         raise ValueError("Cet identifiant existe déjà.")
     user = Utilisateur(nom=nom, identifiant=identifiant, role=role, actif=True)
@@ -336,4 +364,7 @@ def add_user(nom, identifiant, role, mot_de_passe):
     except IntegrityError:
         db.session.rollback()
         raise ValueError("Cet identifiant existe déjà.")
+
+    _journaliser(cree_par, "creation_utilisateur", f"Création du compte « {identifiant} » ({role}).")
+    db.session.commit()
     return user

@@ -171,3 +171,46 @@ class Sortie(db.Model):
 
     def __repr__(self):
         return f"<Sortie article={self.article_id} -{self.quantite}>"
+
+
+# Libellé + classe Bootstrap affichés pour chaque type d'action du
+# journal d'activité (voir JournalActivite ci-dessous).
+ACTIONS_JOURNAL = {
+    "connexion": ("Connexion", "info"),
+    "creation_utilisateur": ("Création utilisateur", "dark"),
+    "entree_stock": ("Entrée de stock", "success"),
+    "sortie_stock": ("Sortie de stock", "danger"),
+}
+
+
+class JournalActivite(db.Model):
+    """Journal d'activité (audit log) : qui a fait quelle action et
+    quand — connexions réussies, créations de comptes utilisateurs,
+    mouvements de stock (voir apps/gtc_data.py, fonction _journaliser).
+    Page de consultation réservée aux administrateurs
+    (/pages/journal/)."""
+
+    __tablename__ = "journal_activite"
+
+    id = db.Column(db.Integer, primary_key=True)
+    horodatage = db.Column(db.DateTime, nullable=False)
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
+    # Copie de l'identifiant au moment de l'action : reste lisible même
+    # si le compte utilisateur est un jour supprimé (pas de fonctionnalité
+    # de suppression aujourd'hui, mais l'historique doit rester exploitable).
+    identifiant = db.Column(db.String(80), nullable=True)
+    action = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+
+    utilisateur = db.relationship("Utilisateur")
+
+    def __repr__(self):
+        return f"<JournalActivite {self.action} par {self.identifiant}>"
+
+    @property
+    def action_libelle(self):
+        return ACTIONS_JOURNAL.get(self.action, (self.action, "secondary"))[0]
+
+    @property
+    def action_classe(self):
+        return ACTIONS_JOURNAL.get(self.action, (self.action, "secondary"))[1]

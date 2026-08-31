@@ -15,7 +15,7 @@ from apps.gtc_data import (
   ALERTES,
   get_stats, get_all_articles, get_article, get_historique, get_mouvements,
   add_entree, add_sortie, get_all_users, get_rapprochement,
-  get_all_fournisseurs, add_fournisseur,
+  get_all_fournisseurs, add_fournisseur, get_journal,
   verify_credentials, add_user, get_user_by_identifiant,
 )
 from apps.models import ROLE_CLASSES
@@ -222,6 +222,12 @@ def pages_utilisateurs():
   return render_template('pages/utilisateurs.html', segment='utilisateurs', parent='pages',
                           utilisateurs=get_all_users())
 
+@app.route('/pages/journal/')
+@admin_required
+def pages_journal():
+  return render_template('pages/journal.html', segment='journal', parent='pages',
+                          journal=get_journal())
+
 # Pages
 
 @app.route('/pages/transactions/')
@@ -325,8 +331,9 @@ def accounts_sign_up():
       return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts')
 
     nom_complet = f"{prenom} {nom}".strip()
+    admin_actuel = get_user_by_identifiant(session.get('identifiant'))
     try:
-      add_user(nom_complet, identifiant, role, mot_de_passe)
+      add_user(nom_complet, identifiant, role, mot_de_passe, cree_par=admin_actuel)
     except ValueError as e:
       flash(str(e), "danger")
       return render_template('accounts/sign-up.html', segment='sign_up', parent='accounts')
