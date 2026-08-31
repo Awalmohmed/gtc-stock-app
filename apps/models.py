@@ -14,6 +14,26 @@ ROLE_CLASSES = {
     "Administrateur": "dark",
 }
 
+# Rôles qui voient tous les magasins (pas de filtrage) plutôt qu'un seul
+# magasin_id qui leur est propre — voir apps/gtc_data.py, magasin_effectif().
+ROLES_TOUS_MAGASINS = ("Administrateur", "Comptable")
+
+
+class Magasin(db.Model):
+    """Point de vente / entrepôt GTC Stock. Un "Gestionnaire de stock"
+    est rattaché à un seul magasin et n'en voit que les articles ; un
+    "Administrateur" ou un "Comptable" voit tous les magasins (voir
+    ROLES_TOUS_MAGASINS)."""
+
+    __tablename__ = "magasins"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(150), unique=True, nullable=False, index=True)
+    adresse = db.Column(db.String(255), nullable=True)
+
+    def __repr__(self):
+        return f"<Magasin {self.nom}>"
+
 
 class Utilisateur(db.Model):
     """Compte utilisateur de l'application GTC Stock."""
@@ -30,6 +50,11 @@ class Utilisateur(db.Model):
     role = db.Column(db.String(50), nullable=False)
     actif = db.Column(db.Boolean, nullable=False, default=True)
     derniere_connexion = db.Column(db.String(50), nullable=True, default="—")
+    # Magasin de rattachement — utile seulement pour "Gestionnaire de
+    # stock" (voir ROLES_TOUS_MAGASINS) ; NULL pour Administrateur/Comptable.
+    magasin_id = db.Column(db.Integer, db.ForeignKey("magasins.id"), nullable=True)
+
+    magasin = db.relationship("Magasin", backref="utilisateurs")
 
     def __repr__(self):
         return f"<Utilisateur {self.identifiant}>"
@@ -113,10 +138,15 @@ class Article(db.Model):
     # du fournisseur d'une livraison précise (voir Entree.fournisseur_id).
     # Alimenté notamment par l'import de fichier (apps/import_articles.py).
     fournisseur_id = db.Column(db.Integer, db.ForeignKey("fournisseurs.id"), nullable=True)
+    # Magasin auquel appartient cet article — un article sans magasin
+    # (NULL) n'est visible que par un Administrateur, tant que personne
+    # ne le lui a assigné (voir apps/gtc_data.py, magasin_effectif()).
+    magasin_id = db.Column(db.Integer, db.ForeignKey("magasins.id"), nullable=True)
 
     entrees = db.relationship("Entree", backref="article", lazy="dynamic")
     sorties = db.relationship("Sortie", backref="article", lazy="dynamic")
     fournisseur = db.relationship("Fournisseur")
+    magasin = db.relationship("Magasin", backref="articles")
 
     def __repr__(self):
         return f"<Article {self.reference}>"
