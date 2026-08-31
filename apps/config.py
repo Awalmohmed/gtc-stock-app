@@ -59,3 +59,18 @@ class Config(object):
     #   ordre : référence article, quantité en stock.
     SAGE_DB_CONNECTION_STRING = os.getenv('SAGE_DB_CONNECTION_STRING')
     SAGE_STOCK_QUERY = os.getenv('SAGE_STOCK_QUERY')
+
+    # E-mails d'alerte de stock (voir apps/mailer.py) — envoyés à
+    # l'adresse du magasin de l'article (Magasin.email_alertes) quand une
+    # sortie fait passer cet article sous son seuil. Si SMTP_HOST n'est
+    # pas renseigné, l'alerte est seulement écrite dans les logs (l'app
+    # ne plante jamais), même logique que le connecteur Sage 100.
+    SMTP_HOST = os.getenv('SMTP_HOST')
+    SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+    SMTP_USER = os.getenv('SMTP_USER')
+    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+    SMTP_USE_TLS = (os.getenv('SMTP_USE_TLS', 'True') == 'True')
+    # Expéditeur affiché et adresse de repli si un magasin n'a pas
+    # d'adresse d'alerte propre.
+    ALERTE_EMAIL_EXPEDITEUR = os.getenv('ALERTE_EMAIL_EXPEDITEUR', 'alertes-stock@gtc.local')
+    ALERTE_EMAIL_DEFAUT = os.getenv('ALERTE_EMAIL_DEFAUT')

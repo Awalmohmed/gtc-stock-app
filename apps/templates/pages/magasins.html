@@ -16,6 +16,7 @@
             <tr>
               <th>Nom</th>
               <th>Adresse</th>
+              <th>E-mail d'alerte</th>
               <th class="text-end">Articles</th>
               <th class="text-end">Gestionnaires</th>
             </tr>
@@ -25,11 +26,20 @@
             <tr>
               <td>{{ m.magasin.nom }}</td>
               <td>{{ m.magasin.adresse or '—' }}</td>
+              <td>
+                <form action="{{ url_for('maj_email_magasin', magasin_id=m.magasin.id) }}" method="post"
+                      class="input-group input-group-sm" style="min-width:16rem;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="email" name="email_alertes" class="form-control"
+                         value="{{ m.magasin.email_alertes or '' }}" placeholder="Aucune — alerte journalisée">
+                  <button type="submit" class="btn btn-outline-secondary">Enregistrer</button>
+                </form>
+              </td>
               <td class="text-end">{{ m.nb_articles }}</td>
               <td class="text-end">{{ m.nb_gestionnaires }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="4" class="text-muted text-center">Aucun magasin enregistré.</td></tr>
+            <tr><td colspan="5" class="text-muted text-center">Aucun magasin enregistré.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -47,9 +57,14 @@
           <label class="form-label small fw-semibold">Nom</label>
           <input type="text" name="nom" class="form-control" placeholder="ex : Magasin Douala-Port" required>
         </div>
-        <div class="mb-3">
+        <div class="mb-2">
           <label class="form-label small fw-semibold">Adresse</label>
           <input type="text" name="adresse" class="form-control" placeholder="Adresse ou zone (optionnel)">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">E-mail d'alerte</label>
+          <input type="email" name="email_alertes" class="form-control" placeholder="stock.magasin@exemple.fr (optionnel)">
+          <div class="form-text">Destinataire des alertes de seuil des articles de ce magasin.</div>
         </div>
         <button type="submit" class="btn btn-primary w-100 fw-semibold">Ajouter</button>
       </form>

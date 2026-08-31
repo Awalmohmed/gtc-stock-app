@@ -30,6 +30,12 @@ class Magasin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nom = db.Column(db.String(150), unique=True, nullable=False, index=True)
     adresse = db.Column(db.String(255), nullable=True)
+    # Adresse à laquelle sont envoyés les e-mails d'alerte de stock des
+    # articles de ce magasin (voir apps/mailer.py). Peut pointer vers la
+    # boîte du gestionnaire ou une liste de diffusion. Vide => on se
+    # rabat sur ALERTE_EMAIL_DEFAUT, sinon l'alerte est seulement
+    # journalisée.
+    email_alertes = db.Column(db.String(255), nullable=True)
 
     def __repr__(self):
         return f"<Magasin {self.nom}>"

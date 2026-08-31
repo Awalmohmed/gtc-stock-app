@@ -15,7 +15,7 @@ from apps.gtc_data import (
   get_stats, get_all_articles, get_article, get_historique, get_mouvements,
   add_entree, add_sortie, get_all_users, get_rapprochement,
   get_all_fournisseurs, add_fournisseur, get_journal, get_alertes,
-  get_all_magasins, get_magasins_detailles, add_magasin,
+  get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
   verify_credentials, add_user, get_user_by_identifiant,
 )
 from apps.models import ROLE_CLASSES, Magasin, ROLES_TOUS_MAGASINS
@@ -265,12 +265,24 @@ def pages_magasins():
 def creer_magasin():
   nom = request.form.get('nom') or ''
   adresse = request.form.get('adresse') or ''
+  email_alertes = request.form.get('email_alertes') or ''
   try:
-    add_magasin(nom, adresse)
+    add_magasin(nom, adresse, email_alertes)
   except ValueError as e:
     flash(str(e), 'danger')
     return redirect(url_for('pages_magasins'))
   flash(f"Magasin « {nom.strip()} » ajouté avec succès.", 'success')
+  return redirect(url_for('pages_magasins'))
+
+@app.route('/pages/magasins/<int:magasin_id>/email', methods=['POST'])
+@admin_required
+def maj_email_magasin(magasin_id):
+  try:
+    maj_magasin_email(magasin_id, request.form.get('email_alertes') or '')
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_magasins'))
+  flash("Adresse d'alerte mise à jour.", 'success')
   return redirect(url_for('pages_magasins'))
 
 @app.route('/pages/journal/')

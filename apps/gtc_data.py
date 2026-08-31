@@ -101,23 +101,49 @@ def get_magasins_detailles():
     return lignes
 
 
-def add_magasin(nom, adresse):
+def _valider_email(valeur):
+    """Normalise une adresse e-mail saisie : renvoie la chaîne nettoyée,
+    None si vide, et lève ValueError si elle n'a manifestement pas la
+    forme d'une adresse (contrôle volontairement minimal)."""
+    valeur = (valeur or "").strip()
+    if not valeur:
+        return None
+    if " " in valeur or valeur.count("@") != 1 or "." not in valeur.split("@")[1]:
+        raise ValueError("L'adresse e-mail d'alerte n'est pas valide.")
+    return valeur
+
+
+def add_magasin(nom, adresse, email_alertes=None):
     """Crée un magasin en base. Lève ValueError si le nom est vide ou
     déjà pris (la contrainte d'unicité en base fait foi, comme pour
-    add_fournisseur / add_user)."""
+    add_fournisseur / add_user), ou si l'e-mail d'alerte est mal formé."""
     nom = (nom or "").strip()
     if not nom:
         raise ValueError("Le nom du magasin est obligatoire.")
+    email_alertes = _valider_email(email_alertes)
     if Magasin.query.filter_by(nom=nom).first():
         raise ValueError("Ce magasin existe déjà.")
 
-    magasin = Magasin(nom=nom, adresse=(adresse or "").strip() or None)
+    magasin = Magasin(nom=nom, adresse=(adresse or "").strip() or None,
+                      email_alertes=email_alertes)
     db.session.add(magasin)
     try:
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
         raise ValueError("Ce magasin existe déjà.")
+    return magasin
+
+
+def maj_magasin_email(magasin_id, email_alertes):
+    """Met à jour (ou efface, si vide) l'adresse d'alerte d'un magasin.
+    Lève ValueError si le magasin est introuvable ou l'adresse mal
+    formée."""
+    magasin = db.session.get(Magasin, magasin_id)
+    if magasin is None:
+        raise ValueError("Magasin introuvable.")
+    magasin.email_alertes = _valider_email(email_alertes)
+    db.session.commit()
     return magasin
 
 
