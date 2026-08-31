@@ -1,0 +1,60 @@
+{% extends 'layouts/gtc-base.html' %}
+
+{% block title %}GTC Stock - Magasins{% endblock title %}
+{% block page_title %}Gestion des magasins{% endblock page_title %}
+
+{% block content %}
+
+<div class="row g-3">
+  <!-- Liste des magasins -->
+  <div class="col-md-8">
+    <div class="card table-card p-3">
+      <h6 class="mb-3">Magasins enregistrés</h6>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead class="text-muted small">
+            <tr>
+              <th>Nom</th>
+              <th>Adresse</th>
+              <th class="text-end">Articles</th>
+              <th class="text-end">Gestionnaires</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in magasins %}
+            <tr>
+              <td>{{ m.magasin.nom }}</td>
+              <td>{{ m.magasin.adresse or '—' }}</td>
+              <td class="text-end">{{ m.nb_articles }}</td>
+              <td class="text-end">{{ m.nb_gestionnaires }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-muted text-center">Aucun magasin enregistré.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulaire d'ajout -->
+  <div class="col-md-4">
+    <div class="card table-card p-3 h-100">
+      <h6 class="mb-3"><i class="bi bi-plus-circle text-primary"></i> Ajouter un magasin</h6>
+      <form action="{{ url_for('creer_magasin') }}" method="post" data-validate novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Nom</label>
+          <input type="text" name="nom" class="form-control" placeholder="ex : Magasin Douala-Port" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Adresse</label>
+          <input type="text" name="adresse" class="form-control" placeholder="Adresse ou zone (optionnel)">
+        </div>
+        <button type="submit" class="btn btn-primary w-100 fw-semibold">Ajouter</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}

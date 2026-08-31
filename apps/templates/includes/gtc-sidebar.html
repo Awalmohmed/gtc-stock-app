@@ -23,6 +23,9 @@
       <i class="bi bi-people me-2"></i> Utilisateurs
     </a>
     {% if current_user and current_user.role == 'Administrateur' %}
+    <a class="nav-link {% if 'magasins' in segment %}active{% endif %}" href="{{ url_for('pages_magasins') }}">
+      <i class="bi bi-shop me-2"></i> Magasins
+    </a>
     <a class="nav-link {% if 'journal' in segment %}active{% endif %}" href="{{ url_for('pages_journal') }}">
       <i class="bi bi-journal-text me-2"></i> Journal d'activité
     </a>

@@ -15,7 +15,7 @@ from apps.gtc_data import (
   get_stats, get_all_articles, get_article, get_historique, get_mouvements,
   add_entree, add_sortie, get_all_users, get_rapprochement,
   get_all_fournisseurs, add_fournisseur, get_journal, get_alertes,
-  get_all_magasins,
+  get_all_magasins, get_magasins_detailles, add_magasin,
   verify_credentials, add_user, get_user_by_identifiant,
 )
 from apps.models import ROLE_CLASSES, Magasin, ROLES_TOUS_MAGASINS
@@ -253,6 +253,25 @@ def pages_alertes():
 def pages_utilisateurs():
   return render_template('pages/utilisateurs.html', segment='utilisateurs', parent='pages',
                           utilisateurs=get_all_users())
+
+@app.route('/pages/magasins/')
+@admin_required
+def pages_magasins():
+  return render_template('pages/magasins.html', segment='magasins', parent='pages',
+                          magasins=get_magasins_detailles())
+
+@app.route('/pages/magasins/nouveau', methods=['POST'])
+@admin_required
+def creer_magasin():
+  nom = request.form.get('nom') or ''
+  adresse = request.form.get('adresse') or ''
+  try:
+    add_magasin(nom, adresse)
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_magasins'))
+  flash(f"Magasin « {nom.strip()} » ajouté avec succès.", 'success')
+  return redirect(url_for('pages_magasins'))
 
 @app.route('/pages/journal/')
 @admin_required

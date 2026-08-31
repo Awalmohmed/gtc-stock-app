@@ -19,6 +19,7 @@
           <th>Nom</th>
           <th>Identifiant</th>
           <th>Rôle</th>
+          <th>Magasin</th>
           <th>Statut</th>
           <th>Dernière connexion</th>
           <th class="text-end">Actions</th>
@@ -30,6 +31,7 @@
           <td>{{ u.nom }}</td>
           <td>{{ u.identifiant }}</td>
           <td><span class="badge bg-{{ u.role_classe }}-subtle text-{{ u.role_classe }}">{{ u.role }}</span></td>
+          <td>{{ u.magasin.nom if u.magasin else '—' }}</td>
           <td>
             {% if u.statut == 'Actif' %}
             <span class="badge bg-success-subtle text-success">Actif</span>

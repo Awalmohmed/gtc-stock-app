@@ -88,6 +88,39 @@ def get_all_magasins():
     return Magasin.query.order_by(Magasin.nom).all()
 
 
+def get_magasins_detailles():
+    """Magasins triés par nom, avec le nombre d'articles et de
+    gestionnaires rattachés — pour la page de gestion des magasins."""
+    lignes = []
+    for magasin in get_all_magasins():
+        lignes.append({
+            "magasin": magasin,
+            "nb_articles": Article.query.filter_by(magasin_id=magasin.id).count(),
+            "nb_gestionnaires": Utilisateur.query.filter_by(magasin_id=magasin.id).count(),
+        })
+    return lignes
+
+
+def add_magasin(nom, adresse):
+    """Crée un magasin en base. Lève ValueError si le nom est vide ou
+    déjà pris (la contrainte d'unicité en base fait foi, comme pour
+    add_fournisseur / add_user)."""
+    nom = (nom or "").strip()
+    if not nom:
+        raise ValueError("Le nom du magasin est obligatoire.")
+    if Magasin.query.filter_by(nom=nom).first():
+        raise ValueError("Ce magasin existe déjà.")
+
+    magasin = Magasin(nom=nom, adresse=(adresse or "").strip() or None)
+    db.session.add(magasin)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError("Ce magasin existe déjà.")
+    return magasin
+
+
 def _journaliser(utilisateur, action, description):
     """Ajoute une ligne au journal d'activité (audit log). N'effectue
     pas le commit elle-même : appelée juste avant le commit existant de
