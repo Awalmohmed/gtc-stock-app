@@ -16,10 +16,11 @@ from apps.gtc_data import (
   add_entree, add_sortie, get_all_users, get_rapprochement,
   get_all_fournisseurs, add_fournisseur, get_journal, get_alertes,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
+  add_article,
   verify_credentials, add_user, get_user_by_identifiant,
 )
 from apps.models import ROLE_CLASSES, Magasin, ROLES_TOUS_MAGASINS
-from apps.auth import login_required, admin_required, is_safe_next_url
+from apps.auth import login_required, admin_required, roles_required, is_safe_next_url
 from apps.rate_limit import secondes_avant_deblocage, enregistrer_echec, reinitialiser
 from apps.import_articles import importer_fichier, modele_csv, FichierInvalide
 from apps import exports
@@ -131,7 +132,36 @@ def pages_fiche_stock():
   article = get_article(article_id) or (articles[0] if articles else None)
   historique = get_historique(article.id) if article else []
   return render_template('pages/fiche_stock.html', segment='fiche_stock', parent='pages',
-                          articles=articles, article=article, historique=historique)
+                          articles=articles, article=article, historique=historique,
+                          fournisseurs=get_all_fournisseurs(), magasins=get_all_magasins())
+
+@app.route('/pages/fiche-stock/nouveau', methods=['POST'])
+@roles_required('Gestionnaire de stock', 'Administrateur')
+def creer_article():
+  utilisateur = get_user_by_identifiant(session.get('identifiant'))
+  # Le magasin de l'article : celui de l'admin choisi dans le formulaire,
+  # sinon (Gestionnaire de stock) son propre magasin de rattachement.
+  if session.get('role') == 'Administrateur':
+    magasin_id = request.form.get('magasin_id', type=int)
+  else:
+    magasin_id = utilisateur.magasin_id if utilisateur else None
+    if not magasin_id:
+      flash("Aucun magasin ne vous est rattaché : contactez un administrateur.", 'danger')
+      return redirect(url_for('pages_fiche_stock'))
+  try:
+    article = add_article(
+      request.form.get('nom') or '',
+      request.form.get('reference') or '',
+      request.form.get('seuil', type=int),
+      request.form.get('quantite', type=int),
+      request.form.get('fournisseur_id', type=int),
+      magasin_id,
+    )
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_fiche_stock'))
+  flash(f"Article « {article.nom} » ({article.reference}) créé avec succès.", 'success')
+  return redirect(url_for('pages_fiche_stock', article=article.id))
 
 def _article_courant_ou_404():
   """Article ciblé par ?article=<id> (ou le premier disponible), pour

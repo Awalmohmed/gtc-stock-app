@@ -57,7 +57,9 @@
 <div class="card table-card p-3">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h6 class="mb-0">Fiche de stock — Aperçu des articles</h6>
+    {% if current_user and current_user.role in ['Gestionnaire de stock', 'Administrateur'] %}
     <a href="{{ url_for('pages_fiche_stock') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Nouvel article</a>
+    {% endif %}
   </div>
   <div class="table-responsive">
     <table class="table align-middle">

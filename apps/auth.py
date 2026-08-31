@@ -78,6 +78,24 @@ def admin_required(view):
     return wrapped
 
 
+def roles_required(*roles):
+    """Exige une session active dont le rôle fait partie de `roles`
+    (ex. gestion du catalogue d'articles : Gestionnaire de stock ou
+    Administrateur, mais pas Comptable)."""
+    def decorateur(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            if 'identifiant' not in session:
+                flash("Veuillez vous connecter pour accéder à cette page.", "warning")
+                return redirect(url_for('accounts_sign_in', next=_current_full_path()))
+            if session.get('role') not in roles:
+                flash("Vous n'avez pas les droits pour effectuer cette action.", "danger")
+                return redirect(url_for('pages_dashboard'))
+            return view(*args, **kwargs)
+        return wrapped
+    return decorateur
+
+
 @app.context_processor
 def inject_current_user():
     """Rend `current_user` disponible dans tous les templates sans avoir

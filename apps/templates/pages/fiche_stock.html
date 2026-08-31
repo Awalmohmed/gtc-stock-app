@@ -3,9 +3,16 @@
 {% block title %}GTC Stock - Fiches de stock{% endblock title %}
 {% block page_title %}Fiches de stock{% endblock page_title %}
 
+{% set peut_gerer = current_user and current_user.role in ['Gestionnaire de stock', 'Administrateur'] %}
+
 {% block content %}
 
-<div class="d-flex justify-content-end mb-3">
+<div class="d-flex justify-content-end gap-2 mb-3">
+  {% if peut_gerer %}
+  <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNouvelArticle">
+    <i class="bi bi-plus-lg"></i> Nouvel article
+  </button>
+  {% endif %}
   <a href="{{ url_for('import_articles') }}" class="btn btn-sm btn-outline-primary">
     <i class="bi bi-file-earmark-arrow-up"></i> Importer des articles (CSV/Excel)
   </a>
@@ -22,9 +29,11 @@
       <div class="list-group list-group-flush">
         {% for a in articles %}
         <a href="{{ url_for('pages_fiche_stock', article=a.id) }}"
-           class="list-group-item list-group-item-action d-flex justify-content-between {% if a.id == article.id %}active{% endif %}">
+           class="list-group-item list-group-item-action d-flex justify-content-between {% if article and a.id == article.id %}active{% endif %}">
           {{ a.nom }} <span class="badge badge-{{ a.statut_classe }}">{{ a.statut }}</span>
         </a>
+        {% else %}
+        <div class="text-muted small text-center py-3">Aucun article pour le moment.</div>
         {% endfor %}
       </div>
     </div>
@@ -32,6 +41,7 @@
 
   <!-- Détail de la fiche -->
   <div class="col-md-8">
+    {% if article %}
     <div class="card table-card p-4">
       <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
@@ -110,7 +120,77 @@
         </table>
       </div>
     </div>
+    {% else %}
+    <div class="card table-card p-5 text-center text-muted">
+      <i class="bi bi-card-list fs-1 d-block mb-2"></i>
+      Aucun article à afficher.
+      {% if peut_gerer %}<br>Utilisez « Nouvel article » pour créer la première fiche de stock.{% endif %}
+    </div>
+    {% endif %}
   </div>
 </div>
+
+{% if peut_gerer %}
+<div class="modal fade" id="modalNouvelArticle" tabindex="-1" aria-labelledby="titreNouvelArticle" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('creer_article') }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="titreNouvelArticle">Nouvel article au catalogue</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" for="art-nom">Désignation</label>
+            <input type="text" id="art-nom" name="nom" class="form-control" maxlength="150"
+                   placeholder="ex : Rame de papier A4" required>
+          </div>
+          <div class="row">
+            <div class="col-sm-6 mb-3">
+              <label class="form-label small fw-semibold" for="art-ref">Référence</label>
+              <input type="text" id="art-ref" name="reference" class="form-control" maxlength="50"
+                     placeholder="ex : REF-0135" required>
+              <div class="form-text">Doit être unique.</div>
+            </div>
+            <div class="col-sm-3 col-6 mb-3">
+              <label class="form-label small fw-semibold" for="art-seuil">Seuil d'alerte</label>
+              <input type="number" id="art-seuil" name="seuil" class="form-control" min="0" value="0" required>
+            </div>
+            <div class="col-sm-3 col-6 mb-3">
+              <label class="form-label small fw-semibold" for="art-qte">Quantité initiale</label>
+              <input type="number" id="art-qte" name="quantite" class="form-control" min="0" value="0" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" for="art-fournisseur">Fournisseur associé (optionnel)</label>
+            <select class="form-select" id="art-fournisseur" name="fournisseur_id">
+              <option value="" selected>— Aucun —</option>
+              {% for f in fournisseurs %}
+              <option value="{{ f.id }}">{{ f.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% if current_user.role == 'Administrateur' %}
+          <div class="mb-1">
+            <label class="form-label small fw-semibold" for="art-magasin">Magasin de rattachement</label>
+            <select class="form-select" id="art-magasin" name="magasin_id" required>
+              <option value="" selected disabled>Sélectionner un magasin</option>
+              {% for m in magasins %}
+              <option value="{{ m.id }}">{{ m.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-primary">Créer l'article</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {% endblock content %}

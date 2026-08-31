@@ -416,6 +416,57 @@ def add_fournisseur(nom, contact):
     return fournisseur
 
 
+def add_article(nom, reference, seuil, quantite, fournisseur_id=None, magasin_id=None):
+    """Crée un article au catalogue. Lève ValueError si un champ
+    obligatoire manque ou est invalide, si la référence existe déjà (la
+    contrainte d'unicité en base fait foi, pas seulement la vérification
+    préalable — même précaution que pour add_user / add_fournisseur), ou
+    si le fournisseur / le magasin indiqué est introuvable.
+
+    Le statut initial est déduit de la quantité vs le seuil (même règle
+    que _recalculer_statut) ; l'article démarre sans dernier mouvement."""
+    nom = (nom or "").strip()
+    reference = (reference or "").strip()
+    if not nom:
+        raise ValueError("La désignation de l'article est obligatoire.")
+    if not reference:
+        raise ValueError("La référence de l'article est obligatoire.")
+    if len(nom) > 150:
+        raise ValueError("La désignation est trop longue (150 caractères maximum).")
+    if len(reference) > 50:
+        raise ValueError("La référence est trop longue (50 caractères maximum).")
+    if seuil is None or seuil < 0:
+        raise ValueError("Le seuil d'alerte doit être un entier positif ou nul.")
+    if quantite is None or quantite < 0:
+        raise ValueError("La quantité initiale doit être un entier positif ou nul.")
+    if not magasin_id or db.session.get(Magasin, magasin_id) is None:
+        raise ValueError("Merci d'indiquer le magasin de rattachement de l'article.")
+
+    fournisseur = None
+    if fournisseur_id:
+        fournisseur = db.session.get(Fournisseur, fournisseur_id)
+        if fournisseur is None:
+            raise ValueError("Fournisseur introuvable.")
+
+    if Article.query.filter_by(reference=reference).first():
+        raise ValueError(f"La référence « {reference} » existe déjà.")
+
+    article = Article(
+        nom=nom, reference=reference, seuil=seuil, quantite=quantite,
+        fournisseur_id=fournisseur.id if fournisseur else None,
+        magasin_id=magasin_id,
+        statut="Alerte" if quantite <= seuil else "OK",
+        dernier_mouvement="—",
+    )
+    db.session.add(article)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError(f"La référence « {reference} » existe déjà.")
+    return article
+
+
 def add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, utilisateur):
     """Enregistre une entrée de stock et met à jour l'article. Lève
     ValueError si l'article ou le fournisseur est introuvable, ou si la
