@@ -22,6 +22,7 @@ from apps.models import (
     Magasin, ROLES_TOUS_MAGASINS,
 )
 from apps import sage_connector
+from apps import mailer
 
 
 # ---------------------------------------------------------------------
@@ -465,14 +466,25 @@ def add_sortie(article_id, date_mouvement, quantite, type_document, reference, u
         type_document=type_document or None, reference=reference or None,
         utilisateur_id=utilisateur.id if utilisateur else None,
     )
+    statut_avant = article.statut
     article.quantite -= quantite
     article.dernier_mouvement = date_mouvement.strftime("%d/%m/%Y")
     _recalculer_statut(article)
+    # L'article vient-il de basculer en alerte avec cette sortie ? On
+    # notifie uniquement sur la transition (pas à chaque sortie tant
+    # qu'il reste en alerte) : le prochain e-mail n'aura lieu qu'après
+    # être repassé au-dessus du seuil puis redescendu.
+    bascule_en_alerte = statut_avant != "Alerte" and article.statut == "Alerte"
 
     db.session.add(sortie)
     _journaliser(utilisateur, "sortie_stock",
                  f"Sortie de {quantite} sur « {article.nom} » ({article.reference}).")
     db.session.commit()
+
+    if bascule_en_alerte:
+        # Après le commit : un échec d'envoi ne doit pas annuler la
+        # sortie (mailer.envoyer_alerte_seuil n'élève jamais d'exception).
+        mailer.envoyer_alerte_seuil(article)
     return sortie
 
 
