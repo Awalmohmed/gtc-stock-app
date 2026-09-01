@@ -3,6 +3,9 @@
 {% block title %}GTC Stock - Articles{% endblock title %}
 {% block page_title %}Articles{% endblock page_title %}
 
+{% set peut_gerer = current_user and current_user.role in ['Gestionnaire de stock', 'Administrateur'] %}
+{% set est_admin = current_user and current_user.role == 'Administrateur' %}
+
 {% block content %}
 
 <div class="card table-card p-3">
@@ -26,6 +29,7 @@
           <th>Statut</th>
           <th>Magasin</th>
           <th>Fournisseur habituel</th>
+          {% if peut_gerer %}<th class="text-end">Actions</th>{% endif %}
         </tr>
       </thead>
       <tbody id="corpsArticles">
@@ -40,15 +44,89 @@
           <td><span class="badge badge-{{ a.statut_classe }}">{{ a.statut }}</span></td>
           <td>{{ a.magasin.nom if a.magasin else '—' }}</td>
           <td>{{ a.fournisseur.nom if a.fournisseur else '—' }}</td>
+          {% if peut_gerer %}
+          <td class="text-end" onclick="event.stopPropagation()">
+            <button type="button" class="btn btn-sm btn-outline-secondary" title="Modifier l'article"
+                    data-bs-toggle="modal" data-bs-target="#modalModifierArticle{{ a.id }}">
+              <i class="bi bi-pencil"></i>
+            </button>
+          </td>
+          {% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-muted text-center py-3">Aucun article dans votre périmètre.</td></tr>
+        <tr><td colspan="{{ 8 if peut_gerer else 7 }}" class="text-muted text-center py-3">Aucun article dans votre périmètre.</td></tr>
         {% endfor %}
       </tbody>
     </table>
     <div id="aucunResultat" class="text-muted text-center py-3 d-none">Aucun article ne correspond à la recherche.</div>
   </div>
 </div>
+
+{% if peut_gerer %}
+{% for a in articles %}
+<div class="modal fade" id="modalModifierArticle{{ a.id }}" tabindex="-1"
+     aria-labelledby="titreModifierArticle{{ a.id }}" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('modifier_article', article_id=a.id) }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="titreModifierArticle{{ a.id }}">Modifier l'article</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-sm-7 mb-3">
+              <label class="form-label small fw-semibold">Référence</label>
+              <input type="text" class="form-control" value="{{ a.reference }}" disabled>
+              <div class="form-text">Identifiant fixe de l'article — non modifiable.</div>
+            </div>
+            <div class="col-sm-5 mb-3">
+              <label class="form-label small fw-semibold">Quantité en stock</label>
+              <input type="text" class="form-control" value="{{ a.quantite }}" disabled>
+              <div class="form-text">Évolue uniquement via les entrées / sorties.</div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" for="art-nom-{{ a.id }}">Désignation</label>
+            <input type="text" id="art-nom-{{ a.id }}" name="nom" class="form-control"
+                   value="{{ a.nom }}" maxlength="150" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" for="art-seuil-{{ a.id }}">Seuil d'alerte</label>
+            <input type="number" id="art-seuil-{{ a.id }}" name="seuil" class="form-control"
+                   value="{{ a.seuil }}" min="0" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" for="art-fournisseur-{{ a.id }}">Fournisseur habituel</label>
+            <select class="form-select" id="art-fournisseur-{{ a.id }}" name="fournisseur_id">
+              <option value="">— Aucun —</option>
+              {% for f in fournisseurs %}
+              <option value="{{ f.id }}" {% if a.fournisseur_id == f.id %}selected{% endif %}>{{ f.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% if est_admin %}
+          <div class="mb-1">
+            <label class="form-label small fw-semibold" for="art-magasin-{{ a.id }}">Magasin de rattachement</label>
+            <select class="form-select" id="art-magasin-{{ a.id }}" name="magasin_id" required>
+              {% for m in magasins %}
+              <option value="{{ m.id }}" {% if a.magasin_id == m.id %}selected{% endif %}>{{ m.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
 
 {% endblock content %}
 

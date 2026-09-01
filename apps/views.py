@@ -16,7 +16,7 @@ from apps.gtc_data import (
   add_entree, add_sortie, get_all_users, get_rapprochement,
   get_all_fournisseurs, add_fournisseur, get_journal, get_alertes,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
-  maj_magasin, add_article,
+  maj_magasin, add_article, maj_article,
   verify_credentials, add_user, maj_utilisateur, basculer_statut_utilisateur,
   reinitialiser_mot_de_passe, get_user_by_identifiant,
 )
@@ -170,6 +170,28 @@ def pages_articles():
   return render_template('pages/articles.html', segment='articles', parent='pages',
                           articles=get_all_articles(),
                           fournisseurs=get_all_fournisseurs(), magasins=get_all_magasins())
+
+@app.route('/pages/articles/<int:article_id>/modifier', methods=['POST'])
+@roles_required('Gestionnaire de stock', 'Administrateur')
+def modifier_article(article_id):
+  # Le magasin de rattachement n'est modifiable que par un Administrateur
+  # (un Gestionnaire de stock ne pourrait de toute façon pas déplacer un
+  # article hors de son propre périmètre).
+  peut_changer_magasin = session.get('role') == 'Administrateur'
+  try:
+    article = maj_article(
+      article_id,
+      request.form.get('nom') or '',
+      request.form.get('seuil', type=int),
+      request.form.get('fournisseur_id', type=int),
+      request.form.get('magasin_id', type=int),
+      peut_changer_magasin=peut_changer_magasin,
+    )
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_articles'))
+  flash(f"Article « {article.nom} » ({article.reference}) modifié avec succès.", 'success')
+  return redirect(url_for('pages_articles'))
 
 def _article_courant_ou_404():
   """Article ciblé par ?article=<id> (ou le premier disponible), pour

@@ -496,6 +496,53 @@ def add_article(nom, reference, seuil, quantite, fournisseur_id=None, magasin_id
     return article
 
 
+def maj_article(article_id, nom, seuil, fournisseur_id=None,
+                magasin_id=None, peut_changer_magasin=False):
+    """Modifie le catalogue d'un article : désignation, seuil d'alerte,
+    fournisseur habituel, et — seulement si `peut_changer_magasin` (rôle
+    Administrateur) — le magasin de rattachement.
+
+    La référence et la quantité en stock ne sont JAMAIS touchées ici :
+    la référence est l'identifiant fixe de l'article, et la quantité ne
+    change que par de vrais mouvements d'entrée/sortie (même règle que
+    l'import de fichier). Le statut Alerte/OK est réaligné sur le nouveau
+    seuil, sauf pour un article « Dormant » qu'on laisse tel quel (idem
+    import).
+
+    L'article est résolu via get_article() : un Gestionnaire de stock ne
+    peut pas modifier un article hors de son magasin (ValueError « Article
+    introuvable »). Lève aussi ValueError si la désignation est vide/trop
+    longue, si le seuil est négatif, ou si le fournisseur / le magasin
+    indiqué est introuvable."""
+    article = get_article(article_id)
+    if article is None:
+        raise ValueError("Article introuvable.")
+    nom = (nom or "").strip()
+    if not nom:
+        raise ValueError("La désignation de l'article est obligatoire.")
+    if len(nom) > 150:
+        raise ValueError("La désignation est trop longue (150 caractères maximum).")
+    if seuil is None or seuil < 0:
+        raise ValueError("Le seuil d'alerte doit être un entier positif ou nul.")
+
+    fournisseur_id = fournisseur_id or None
+    if fournisseur_id and db.session.get(Fournisseur, fournisseur_id) is None:
+        raise ValueError("Fournisseur introuvable.")
+
+    if peut_changer_magasin:
+        if not magasin_id or db.session.get(Magasin, magasin_id) is None:
+            raise ValueError("Merci d'indiquer le magasin de rattachement de l'article.")
+        article.magasin_id = magasin_id
+
+    article.nom = nom
+    article.seuil = seuil
+    article.fournisseur_id = fournisseur_id
+    if article.statut != "Dormant":
+        article.statut = "Alerte" if article.quantite <= seuil else "OK"
+    db.session.commit()
+    return article
+
+
 def add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, utilisateur):
     """Enregistre une entrée de stock et met à jour l'article. Lève
     ValueError si l'article ou le fournisseur est introuvable, ou si la
