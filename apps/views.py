@@ -18,7 +18,7 @@ from apps.gtc_data import (
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
   maj_magasin, add_article,
   verify_credentials, add_user, maj_utilisateur, basculer_statut_utilisateur,
-  get_user_by_identifiant,
+  reinitialiser_mot_de_passe, get_user_by_identifiant,
 )
 from apps.models import ROLE_CLASSES, Magasin, ROLES_TOUS_MAGASINS
 from apps.auth import login_required, admin_required, roles_required, is_safe_next_url
@@ -314,6 +314,24 @@ def statut_utilisateur(user_id):
     flash(str(e), 'danger')
     return redirect(url_for('pages_utilisateurs'))
   flash(f"Compte « {user.identifiant} » {'activé' if user.actif else 'désactivé'}.", 'success')
+  return redirect(url_for('pages_utilisateurs'))
+
+@app.route('/pages/utilisateurs/<int:user_id>/mot-de-passe', methods=['POST'])
+@admin_required
+def reinit_mot_de_passe_utilisateur(user_id):
+  acteur = get_user_by_identifiant(session.get('identifiant'))
+  try:
+    user = reinitialiser_mot_de_passe(
+      user_id,
+      request.form.get('mot_de_passe') or '',
+      request.form.get('mot_de_passe_confirmation') or '',
+      acteur=acteur,
+    )
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_utilisateurs'))
+  flash(f"Mot de passe du compte « {user.identifiant} » réinitialisé. "
+        f"Il prendra effet à sa prochaine connexion.", 'success')
   return redirect(url_for('pages_utilisateurs'))
 
 @app.route('/pages/magasins/')

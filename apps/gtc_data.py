@@ -700,3 +700,29 @@ def basculer_statut_utilisateur(user_id, actif, acteur=None):
                  f"Compte « {user.identifiant} » {'activé' if actif else 'désactivé'}.")
     db.session.commit()
     return user
+
+
+def reinitialiser_mot_de_passe(user_id, nouveau, confirmation, acteur=None):
+    """Définit un nouveau mot de passe pour un compte existant (action
+    d'administration, distincte de maj_utilisateur). Mêmes règles que la
+    création : au moins 8 caractères et confirmation identique. La
+    session en cours de l'utilisateur ciblé n'est pas invalidée (Flask
+    utilise des sessions côté client) : le nouveau mot de passe
+    s'applique à la prochaine connexion. Journalisé sans jamais écrire le
+    mot de passe. Lève ValueError si le compte est introuvable, si le
+    mot de passe est trop court ou si la confirmation ne correspond
+    pas."""
+    user = db.session.get(Utilisateur, user_id)
+    if user is None:
+        raise ValueError("Utilisateur introuvable.")
+    nouveau = nouveau or ""
+    if len(nouveau) < 8:
+        raise ValueError("Le mot de passe doit contenir au moins 8 caractères.")
+    if nouveau != (confirmation or ""):
+        raise ValueError("La confirmation du mot de passe ne correspond pas.")
+
+    user.set_password(nouveau)
+    _journaliser(acteur, "reinit_mot_de_passe",
+                 f"Réinitialisation du mot de passe du compte « {user.identifiant} ».")
+    db.session.commit()
+    return user

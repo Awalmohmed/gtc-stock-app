@@ -48,6 +48,10 @@
                     data-bs-toggle="modal" data-bs-target="#modalModifierUtilisateur{{ u.id }}">
               <i class="bi bi-pencil"></i>
             </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" title="Réinitialiser le mot de passe"
+                    data-bs-toggle="modal" data-bs-target="#modalMotDePasse{{ u.id }}">
+              <i class="bi bi-key"></i>
+            </button>
             {% if u.identifiant == current_user.identifiant %}
             <button type="button" class="btn btn-sm btn-outline-danger" disabled
                     title="Vous ne pouvez pas désactiver votre propre compte">
@@ -138,6 +142,44 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalMotDePasse{{ u.id }}" tabindex="-1"
+     aria-labelledby="titreMotDePasse{{ u.id }}" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('reinit_mot_de_passe_utilisateur', user_id=u.id) }}" method="post"
+            data-validate novalidate autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="titreMotDePasse{{ u.id }}">Réinitialiser le mot de passe</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">
+            Compte <strong>{{ u.identifiant }}</strong> ({{ u.nom }}). Définissez un nouveau mot de passe et
+            communiquez-le à l'utilisateur : il prendra effet à sa prochaine connexion.
+          </p>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" for="pwd-new-{{ u.id }}">Nouveau mot de passe</label>
+            <input type="password" id="pwd-new-{{ u.id }}" name="mot_de_passe" class="form-control"
+                   autocomplete="new-password" minlength="8" data-pwd-original data-pwd-strength required>
+            <div class="pwd-strength"><div class="pwd-strength-bar"></div></div>
+          </div>
+          <div class="mb-1">
+            <label class="form-label small fw-semibold" for="pwd-conf-{{ u.id }}">Confirmation</label>
+            <input type="password" id="pwd-conf-{{ u.id }}" name="mot_de_passe_confirmation" class="form-control"
+                   autocomplete="new-password" minlength="8" data-pwd-confirm required>
+          </div>
+          <p class="text-muted small mb-0 mt-2">8 caractères minimum.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-warning">Réinitialiser le mot de passe</button>
         </div>
       </form>
     </div>

@@ -216,6 +216,7 @@ ACTIONS_JOURNAL = {
     "creation_utilisateur": ("Création utilisateur", "dark"),
     "modification_utilisateur": ("Modification utilisateur", "dark"),
     "statut_utilisateur": ("Activation / désactivation", "secondary"),
+    "reinit_mot_de_passe": ("Réinitialisation mot de passe", "warning"),
     "entree_stock": ("Entrée de stock", "success"),
     "sortie_stock": ("Sortie de stock", "danger"),
 }
