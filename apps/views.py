@@ -164,6 +164,13 @@ def creer_article():
   flash(f"Article « {article.nom} » ({article.reference}) créé avec succès.", 'success')
   return redirect(url_for('pages_fiche_stock', article=article.id))
 
+@app.route('/pages/articles/')
+@login_required
+def pages_articles():
+  return render_template('pages/articles.html', segment='articles', parent='pages',
+                          articles=get_all_articles(),
+                          fournisseurs=get_all_fournisseurs(), magasins=get_all_magasins())
+
 def _article_courant_ou_404():
   """Article ciblé par ?article=<id> (ou le premier disponible), pour
   les routes d'export — None si aucun article n'existe en base."""

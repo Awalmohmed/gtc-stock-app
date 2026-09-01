@@ -13,6 +13,9 @@
     <a class="nav-link {% if 'fiche_stock' in segment %}active{% endif %}" href="{{ url_for('pages_fiche_stock') }}">
       <i class="bi bi-card-list me-2"></i> Fiches de stock
     </a>
+    <a class="nav-link {% if 'articles' in segment %}active{% endif %}" href="{{ url_for('pages_articles') }}">
+      <i class="bi bi-boxes me-2"></i> Articles
+    </a>
     <a class="nav-link {% if 'rapprochement' in segment %}active{% endif %}" href="{{ url_for('pages_rapprochement') }}">
       <i class="bi bi-check2-circle me-2"></i> Rapprochement
     </a>
