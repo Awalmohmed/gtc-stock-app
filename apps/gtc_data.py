@@ -19,7 +19,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from apps import db
 from apps.models import (
     Utilisateur, Article, Entree, Sortie, Fournisseur, JournalActivite,
-    Magasin, ROLES_TOUS_MAGASINS,
+    Magasin, ROLE_CLASSES, ROLES_TOUS_MAGASINS,
 )
 from apps import sage_connector
 from apps import mailer
@@ -627,5 +627,76 @@ def add_user(nom, identifiant, role, mot_de_passe, magasin_id=None, cree_par=Non
         raise ValueError("Cet identifiant existe déjà.")
 
     _journaliser(cree_par, "creation_utilisateur", f"Création du compte « {identifiant} » ({role}).")
+    db.session.commit()
+    return user
+
+
+def _resoudre_magasin_pour_role(role, magasin_id):
+    """Applique la règle magasin/rôle commune à la création et à la
+    modification : un « Gestionnaire de stock » doit être rattaché à un
+    magasin existant ; pour un Administrateur ou un Comptable (voir
+    ROLES_TOUS_MAGASINS), le rattachement n'a pas de sens et est forcé à
+    NULL. Lève ValueError si le rôle est inconnu ou si le magasin d'un
+    gestionnaire est absent/introuvable. Retourne le magasin_id à
+    enregistrer."""
+    if role not in ROLE_CLASSES:
+        raise ValueError("Rôle invalide.")
+    if role in ROLES_TOUS_MAGASINS:
+        return None
+    if not magasin_id or db.session.get(Magasin, magasin_id) is None:
+        raise ValueError(
+            "Merci de sélectionner le magasin de rattachement du gestionnaire de stock."
+        )
+    return magasin_id
+
+
+def maj_utilisateur(user_id, nom, role, magasin_id, actif, acteur=None):
+    """Modifie le nom, le rôle, le magasin de rattachement et le statut
+    actif d'un compte existant. L'identifiant (login) n'est
+    volontairement pas modifiable — il sert d'ancre à l'historique et à
+    la session. Mêmes règles que add_user pour le couple rôle/magasin
+    (voir _resoudre_magasin_pour_role). `acteur` est l'utilisateur qui
+    effectue la modification : il ne peut pas se désactiver lui-même
+    (garde-fou). Lève ValueError si le compte est introuvable, si le nom
+    est vide, si le rôle est invalide, si le magasin d'un gestionnaire
+    manque, ou en cas d'auto-désactivation."""
+    user = db.session.get(Utilisateur, user_id)
+    if user is None:
+        raise ValueError("Utilisateur introuvable.")
+    nom = (nom or "").strip()
+    if not nom:
+        raise ValueError("Le nom de l'utilisateur est obligatoire.")
+    role = (role or "").strip()
+    magasin_id = _resoudre_magasin_pour_role(role, magasin_id)
+    actif = bool(actif)
+    if acteur is not None and acteur.id == user.id and not actif:
+        raise ValueError("Vous ne pouvez pas désactiver votre propre compte.")
+
+    user.nom = nom
+    user.role = role
+    user.magasin_id = magasin_id
+    user.actif = actif
+    _journaliser(acteur, "modification_utilisateur",
+                 f"Modification du compte « {user.identifiant} » "
+                 f"(rôle : {role}, statut : {'actif' if actif else 'désactivé'}).")
+    db.session.commit()
+    return user
+
+
+def basculer_statut_utilisateur(user_id, actif, acteur=None):
+    """Active ou désactive un compte, sans toucher aux autres champs
+    (bouton dédié de la liste des utilisateurs). Même garde-fou
+    d'auto-désactivation que maj_utilisateur. Lève ValueError si le
+    compte est introuvable ou en cas d'auto-désactivation."""
+    user = db.session.get(Utilisateur, user_id)
+    if user is None:
+        raise ValueError("Utilisateur introuvable.")
+    actif = bool(actif)
+    if acteur is not None and acteur.id == user.id and not actif:
+        raise ValueError("Vous ne pouvez pas désactiver votre propre compte.")
+
+    user.actif = actif
+    _journaliser(acteur, "statut_utilisateur",
+                 f"Compte « {user.identifiant} » {'activé' if actif else 'désactivé'}.")
     db.session.commit()
     return user

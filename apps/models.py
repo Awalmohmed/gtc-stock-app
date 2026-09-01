@@ -214,6 +214,8 @@ class Sortie(db.Model):
 ACTIONS_JOURNAL = {
     "connexion": ("Connexion", "info"),
     "creation_utilisateur": ("Création utilisateur", "dark"),
+    "modification_utilisateur": ("Modification utilisateur", "dark"),
+    "statut_utilisateur": ("Activation / désactivation", "secondary"),
     "entree_stock": ("Entrée de stock", "success"),
     "sortie_stock": ("Sortie de stock", "danger"),
 }
