@@ -107,11 +107,16 @@
           </div>
           <div class="mb-3">
             <label class="form-label small fw-semibold" for="usr-role-{{ u.id }}">Rôle</label>
-            <select class="form-select js-role" id="usr-role-{{ u.id }}" name="role" required>
+            <select class="form-select js-role" id="usr-role-{{ u.id }}" name="role" required
+                    {% if u.identifiant == current_user.identifiant %}disabled{% endif %}>
               <option {% if u.role == 'Gestionnaire de stock' %}selected{% endif %}>Gestionnaire de stock</option>
               <option {% if u.role == 'Comptable' %}selected{% endif %}>Comptable</option>
               <option {% if u.role == 'Administrateur' %}selected{% endif %}>Administrateur</option>
             </select>
+            {% if u.identifiant == current_user.identifiant %}
+            <input type="hidden" name="role" value="{{ u.role }}">
+            <div class="form-text">Vous ne pouvez pas modifier votre propre rôle.</div>
+            {% endif %}
           </div>
           <div class="mb-3 js-magasin-groupe">
             <label class="form-label small fw-semibold" for="usr-magasin-{{ u.id }}">Magasin de rattachement</label>

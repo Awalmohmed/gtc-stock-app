@@ -669,8 +669,14 @@ def maj_utilisateur(user_id, nom, role, magasin_id, actif, acteur=None):
     role = (role or "").strip()
     magasin_id = _resoudre_magasin_pour_role(role, magasin_id)
     actif = bool(actif)
-    if acteur is not None and acteur.id == user.id and not actif:
-        raise ValueError("Vous ne pouvez pas désactiver votre propre compte.")
+    if acteur is not None and acteur.id == user.id:
+        # Garde-fous : un administrateur ne peut ni se désactiver, ni se
+        # retirer son propre rôle d'administrateur (il pourrait perdre
+        # tout accès aux pages d'administration).
+        if not actif:
+            raise ValueError("Vous ne pouvez pas désactiver votre propre compte.")
+        if user.role == "Administrateur" and role != "Administrateur":
+            raise ValueError("Vous ne pouvez pas retirer votre propre rôle d'administrateur.")
 
     user.nom = nom
     user.role = role
