@@ -19,6 +19,7 @@
               <th>E-mail d'alerte</th>
               <th class="text-end">Articles</th>
               <th class="text-end">Gestionnaires</th>
+              <th class="text-end">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -37,9 +38,15 @@
               </td>
               <td class="text-end">{{ m.nb_articles }}</td>
               <td class="text-end">{{ m.nb_gestionnaires }}</td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary" title="Modifier le magasin"
+                        data-bs-toggle="modal" data-bs-target="#modalModifierMagasin{{ m.magasin.id }}">
+                  <i class="bi bi-pencil"></i>
+                </button>
+              </td>
             </tr>
             {% else %}
-            <tr><td colspan="5" class="text-muted text-center">Aucun magasin enregistré.</td></tr>
+            <tr><td colspan="6" class="text-muted text-center">Aucun magasin enregistré.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -71,5 +78,44 @@
     </div>
   </div>
 </div>
+
+{% for m in magasins %}
+<div class="modal fade" id="modalModifierMagasin{{ m.magasin.id }}" tabindex="-1"
+     aria-labelledby="titreModifierMagasin{{ m.magasin.id }}" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('modifier_magasin', magasin_id=m.magasin.id) }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="titreModifierMagasin{{ m.magasin.id }}">Modifier le magasin</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" for="mag-nom-{{ m.magasin.id }}">Nom</label>
+            <input type="text" id="mag-nom-{{ m.magasin.id }}" name="nom" class="form-control"
+                   value="{{ m.magasin.nom }}" maxlength="150" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold" for="mag-adr-{{ m.magasin.id }}">Adresse</label>
+            <input type="text" id="mag-adr-{{ m.magasin.id }}" name="adresse" class="form-control"
+                   value="{{ m.magasin.adresse or '' }}" placeholder="Adresse ou zone (optionnel)">
+          </div>
+          <div class="mb-1">
+            <label class="form-label small fw-semibold" for="mag-mail-{{ m.magasin.id }}">E-mail d'alerte</label>
+            <input type="email" id="mag-mail-{{ m.magasin.id }}" name="email_alertes" class="form-control"
+                   value="{{ m.magasin.email_alertes or '' }}" placeholder="Aucune — alerte journalisée">
+            <div class="form-text">Destinataire des alertes de seuil des articles de ce magasin.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
 
 {% endblock content %}

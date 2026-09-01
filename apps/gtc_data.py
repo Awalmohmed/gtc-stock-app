@@ -148,6 +148,35 @@ def maj_magasin_email(magasin_id, email_alertes):
     return magasin
 
 
+def maj_magasin(magasin_id, nom, adresse, email_alertes=None):
+    """Modifie le nom, l'adresse et l'e-mail d'alerte d'un magasin
+    existant. Mêmes règles de validation que add_magasin (nom
+    obligatoire, unique, e-mail bien formé). Le nom peut changer même si
+    des articles ou des utilisateurs sont rattachés au magasin : le
+    rattachement se fait par id, pas par nom. Lève ValueError si le
+    magasin est introuvable, si le nom est vide ou déjà porté par un
+    autre magasin, ou si l'e-mail est mal formé."""
+    magasin = db.session.get(Magasin, magasin_id)
+    if magasin is None:
+        raise ValueError("Magasin introuvable.")
+    nom = (nom or "").strip()
+    if not nom:
+        raise ValueError("Le nom du magasin est obligatoire.")
+    email_alertes = _valider_email(email_alertes)
+    if Magasin.query.filter(Magasin.nom == nom, Magasin.id != magasin_id).first():
+        raise ValueError("Ce magasin existe déjà.")
+
+    magasin.nom = nom
+    magasin.adresse = (adresse or "").strip() or None
+    magasin.email_alertes = email_alertes
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError("Ce magasin existe déjà.")
+    return magasin
+
+
 def _journaliser(utilisateur, action, description):
     """Ajoute une ligne au journal d'activité (audit log). N'effectue
     pas le commit elle-même : appelée juste avant le commit existant de

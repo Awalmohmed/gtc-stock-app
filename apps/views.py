@@ -16,7 +16,7 @@ from apps.gtc_data import (
   add_entree, add_sortie, get_all_users, get_rapprochement,
   get_all_fournisseurs, add_fournisseur, get_journal, get_alertes,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
-  add_article,
+  maj_magasin, add_article,
   verify_credentials, add_user, get_user_by_identifiant,
 )
 from apps.models import ROLE_CLASSES, Magasin, ROLES_TOUS_MAGASINS
@@ -313,6 +313,22 @@ def maj_email_magasin(magasin_id):
     flash(str(e), 'danger')
     return redirect(url_for('pages_magasins'))
   flash("Adresse d'alerte mise à jour.", 'success')
+  return redirect(url_for('pages_magasins'))
+
+@app.route('/pages/magasins/<int:magasin_id>/modifier', methods=['POST'])
+@admin_required
+def modifier_magasin(magasin_id):
+  try:
+    magasin = maj_magasin(
+      magasin_id,
+      request.form.get('nom') or '',
+      request.form.get('adresse') or '',
+      request.form.get('email_alertes') or '',
+    )
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_magasins'))
+  flash(f"Magasin « {magasin.nom} » modifié avec succès.", 'success')
   return redirect(url_for('pages_magasins'))
 
 @app.route('/pages/journal/')
