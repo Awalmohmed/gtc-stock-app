@@ -31,8 +31,10 @@ def _horodatage():
 # PDF — mise en page commune (titre + sous-titre + un ou plusieurs tableaux)
 # ---------------------------------------------------------------------
 def _construire_pdf(titre, sous_titre, tableaux):
-    """tableaux : liste de (legende_ou_None, liste_de_lignes) ; la
-    première ligne de chaque liste est traitée comme l'en-tête."""
+    """tableaux : liste de (legende_ou_None, liste_de_lignes[, styles_sup]) ;
+    la première ligne de chaque liste est traitée comme l'en-tête.
+    styles_sup (optionnel) : commandes TableStyle ajoutées après le style
+    commun, pour colorer certaines cellules au cas par cas."""
     tampon = io.BytesIO()
     doc = SimpleDocTemplate(
         tampon, pagesize=A4,
@@ -43,7 +45,9 @@ def _construire_pdf(titre, sous_titre, tableaux):
         Paragraph(sous_titre, _STYLES["Normal"]),
         Spacer(1, 0.5 * cm),
     ]
-    for legende, lignes in tableaux:
+    for tableau in tableaux:
+        legende, lignes = tableau[0], tableau[1]
+        styles_sup = tableau[2] if len(tableau) > 2 else []
         if legende:
             elements.append(Paragraph(legende, _STYLES["Heading3"]))
         table = Table(lignes, repeatRows=1)
@@ -55,7 +59,7 @@ def _construire_pdf(titre, sous_titre, tableaux):
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d0d5dd")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f8fa")]),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ]))
+        ] + list(styles_sup)))
         elements.append(table)
         elements.append(Spacer(1, 0.5 * cm))
     doc.build(elements)
@@ -142,17 +146,36 @@ def fiche_stock_excel(article, historique):
 # ---------------------------------------------------------------------
 def rapprochement_pdf(lignes, sage_connecte):
     source = "Sage 100 (connexion en direct)" if sage_connecte else "données de démonstration (Sage 100 non connecté)"
-    tableau = [["Article", "Quantité application", "Quantité Sage 100", "Écart", "Statut"]]
-    tableau += [
-        [l["article"], str(l["qte_app"]), str(l["qte_sage"]), str(l["ecart"]),
-         "Conforme" if l["conforme"] else "Écart détecté"]
-        for l in lignes
-    ] or [["Aucune donnée de rapprochement.", "", "", "", ""]]
+    entetes = ["Article", "Quantité application", "Quantité Sage 100", "Écart", "Statut", "Conformité"]
+    tableau = [entetes]
+    col_conformite = len(entetes) - 1
+    # Couleurs choisies pour rester distinctes en niveaux de gris à l'impression,
+    # mais le texte « Conforme »/« Écart » suffit seul si la couleur est perdue.
+    vert_fond, vert_texte = colors.HexColor("#d4edda"), colors.HexColor("#0f7b34")
+    rouge_fond, rouge_texte = colors.HexColor("#f8d7da"), colors.HexColor("#b42318")
+    styles_conformite = []
+    for l in lignes:
+        conforme = l["conforme"]
+        tableau.append([
+            l["article"], str(l["qte_app"]), str(l["qte_sage"]), str(l["ecart"]),
+            "Conforme" if conforme else "Écart détecté",
+            "Conforme" if conforme else "Écart",
+        ])
+        rang = len(tableau) - 1
+        cellule = (col_conformite, rang)
+        styles_conformite += [
+            ("BACKGROUND", cellule, cellule, vert_fond if conforme else rouge_fond),
+            ("TEXTCOLOR", cellule, cellule, vert_texte if conforme else rouge_texte),
+            ("FONTNAME", cellule, cellule, "Helvetica-Bold"),
+            ("ALIGN", cellule, cellule, "CENTER"),
+        ]
+    if not lignes:
+        tableau.append(["Aucune donnée de rapprochement.", "", "", "", "", ""])
 
     return _construire_pdf(
         "Rapprochement comptable — GTC Stock",
         f"Généré le {_horodatage()} — Source : {source}",
-        [(None, tableau)],
+        [(None, tableau, styles_conformite)],
     )
 
 
