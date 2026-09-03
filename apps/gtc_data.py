@@ -63,8 +63,13 @@ def _scope_magasin():
     return ("magasin", user.magasin_id) if user.magasin_id else ("aucun", None)
 
 
-def _filtrer_articles(query):
-    """Restreint une requête sur Article au périmètre magasin courant."""
+def _filtrer_articles(query, inclure_archives=False):
+    """Restreint une requête sur Article au périmètre magasin courant.
+    Exclut aussi les articles archivés (suppression douce) sauf si
+    `inclure_archives` — seul le rapprochement comptable les conserve,
+    pour ne pas masquer silencieusement un écart avec Sage 100."""
+    if not inclure_archives:
+        query = query.filter(Article.archive.is_(False))
     mode, magasin_id = _scope_magasin()
     if mode == "magasin":
         return query.filter(Article.magasin_id == magasin_id)
@@ -294,21 +299,36 @@ def get_stats():
     }
 
 
-def get_all_articles():
+def get_all_articles(inclure_archives=False):
     """Retourne les articles du magasin courant, triés par nom (voir
-    _scope_magasin pour la règle de visibilité selon le rôle)."""
-    return _filtrer_articles(Article.query).order_by(Article.nom).all()
+    _scope_magasin pour la règle de visibilité selon le rôle). Les
+    articles archivés sont exclus sauf si `inclure_archives`."""
+    return _filtrer_articles(
+        Article.query, inclure_archives=inclure_archives
+    ).order_by(Article.nom).all()
 
 
-def get_article(article_id):
+def get_articles_archives():
+    """Les seuls articles archivés du périmètre courant, triés par nom —
+    pour la vue « Afficher les articles archivés » de la page Articles
+    (réservée à l'administrateur)."""
+    return _filtrer_articles(
+        Article.query.filter(Article.archive.is_(True)), inclure_archives=True
+    ).order_by(Article.nom).all()
+
+
+def get_article(article_id, inclure_archives=False):
     """Retourne l'article correspondant à l'id, ou None si absent,
-    invalide, ou hors du périmètre magasin de l'utilisateur courant.
-    Ce dernier cas sert aussi de garde-fou aux saisies d'entrée/sortie
-    (add_entree/add_sortie passent par ici)."""
+    invalide, hors du périmètre magasin de l'utilisateur courant, ou
+    archivé (sauf si `inclure_archives`). Sert aussi de garde-fou aux
+    saisies d'entrée/sortie (add_entree/add_sortie passent par ici : un
+    article archivé n'accepte plus aucun mouvement)."""
     if not article_id:
         return None
     article = db.session.get(Article, article_id)
     if article is None or not _article_visible(article):
+        return None
+    if article.archive and not inclure_archives:
         return None
     return article
 
@@ -323,16 +343,21 @@ def get_rapprochement():
         les données de démonstration RAPPROCHEMENT (sage_connecte=False),
         avec le détail de l'erreur le cas échéant pour l'afficher à
         l'utilisateur plutôt que de masquer le problème."""
+    # inclure_archives=True partout ici : un article archivé qui présente
+    # encore un écart avec Sage 100 doit rester visible au rapprochement,
+    # pas être masqué silencieusement.
     if not sage_connector.is_configured():
-        return _lignes_demo_visibles(RAPPROCHEMENT, lambda l: l["article"]), False, None
+        return _lignes_demo_visibles(RAPPROCHEMENT, lambda l: l["article"],
+                                     inclure_archives=True), False, None
 
     try:
         quantites_sage = sage_connector.get_quantites_sage()
     except sage_connector.SageConnectorError as e:
-        return _lignes_demo_visibles(RAPPROCHEMENT, lambda l: l["article"]), False, str(e)
+        return _lignes_demo_visibles(RAPPROCHEMENT, lambda l: l["article"],
+                                     inclure_archives=True), False, str(e)
 
     lignes = []
-    for article in get_all_articles():
+    for article in get_all_articles(inclure_archives=True):
         qte_sage = quantites_sage.get(article.reference)
         if qte_sage is None:
             continue  # article absent de la base Sage : pas de comparaison possible
@@ -347,17 +372,19 @@ def get_rapprochement():
     return lignes, True, None
 
 
-def _lignes_demo_visibles(lignes, nom_article):
+def _lignes_demo_visibles(lignes, nom_article, inclure_archives=False):
     """Filtre une liste de dictionnaires de démonstration (RAPPROCHEMENT,
     ALERTES) sur le magasin courant, au mieux : une ligne est conservée
     si le nom d'article qu'elle mentionne (extrait par `nom_article`,
     qui peut renvoyer le nom exact ou un libellé qui le contient)
     correspond à un article visible. `lignes` est renvoyée telle quelle
-    quand aucun filtre n'est actif (admin/comptable sans sélection)."""
+    quand aucun filtre n'est actif (admin/comptable sans sélection).
+    `inclure_archives` est propagé à get_all_articles (le rapprochement
+    conserve les articles archivés, pas la page Alertes)."""
     mode, _magasin_id = _scope_magasin()
     if mode == "tous":
         return lignes
-    noms_visibles = {a.nom for a in get_all_articles()}
+    noms_visibles = {a.nom for a in get_all_articles(inclure_archives=inclure_archives)}
     return [
         ligne for ligne in lignes
         if any(nom in nom_article(ligne) for nom in noms_visibles)
@@ -543,13 +570,46 @@ def maj_article(article_id, nom, seuil, fournisseur_id=None,
     return article
 
 
+def archiver_article(article_id, acteur=None):
+    """Archive un article (suppression douce) : il sort des vues
+    opérationnelles et n'accepte plus aucun mouvement, mais reste en base
+    avec tout son historique. L'accès est contrôlé par la route
+    (Gestionnaire de stock ou Administrateur). Lève ValueError si
+    l'article est introuvable ou hors périmètre, ou s'il est déjà
+    archivé."""
+    article = db.session.get(Article, article_id)
+    if article is None or not _article_visible(article):
+        raise ValueError("Article introuvable.")
+    if article.archive:
+        raise ValueError("Cet article est déjà archivé.")
+    article.archive = True
+    _journaliser(acteur, "archive_article",
+                 f"Archivage de l'article « {article.nom} » ({article.reference}).")
+    db.session.commit()
+    return article
+
+
+def _article_mouvementable(article_id):
+    """Article visible ET non archivé, pour add_entree / add_sortie.
+    Lève ValueError avec un message distinct selon le cas : introuvable /
+    hors périmètre, ou archivé (aucun mouvement possible tant qu'il n'est
+    pas désarchivé)."""
+    article = get_article(article_id, inclure_archives=True)
+    if article is None:
+        raise ValueError("Article introuvable.")
+    if article.archive:
+        raise ValueError(
+            f"L'article « {article.nom} » est archivé : aucun mouvement ne peut y être "
+            "enregistré. Désarchivez-le d'abord."
+        )
+    return article
+
+
 def add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, utilisateur):
     """Enregistre une entrée de stock et met à jour l'article. Lève
     ValueError si l'article ou le fournisseur est introuvable, ou si la
     quantité est invalide."""
-    article = get_article(article_id)
-    if not article:
-        raise ValueError("Article introuvable.")
+    article = _article_mouvementable(article_id)
     if quantite <= 0:
         raise ValueError("La quantité doit être supérieure à zéro.")
     fournisseur = db.session.get(Fournisseur, fournisseur_id) if fournisseur_id else None
@@ -577,9 +637,7 @@ def add_sortie(article_id, date_mouvement, quantite, type_document, reference, u
     ValueError si l'article est introuvable, la quantité invalide, ou
     si le stock disponible est insuffisant (le stock ne peut jamais
     devenir négatif)."""
-    article = get_article(article_id)
-    if not article:
-        raise ValueError("Article introuvable.")
+    article = _article_mouvementable(article_id)
     if quantite <= 0:
         raise ValueError("La quantité doit être supérieure à zéro.")
     if quantite > article.quantite:

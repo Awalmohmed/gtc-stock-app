@@ -16,7 +16,7 @@ from apps.gtc_data import (
   add_entree, add_sortie, get_all_users, get_rapprochement,
   get_all_fournisseurs, add_fournisseur, get_journal, get_alertes,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
-  maj_magasin, add_article, maj_article,
+  maj_magasin, add_article, maj_article, archiver_article,
   verify_credentials, add_user, maj_utilisateur, basculer_statut_utilisateur,
   reinitialiser_mot_de_passe, get_user_by_identifiant,
 )
@@ -191,6 +191,19 @@ def modifier_article(article_id):
     flash(str(e), 'danger')
     return redirect(url_for('pages_articles'))
   flash(f"Article « {article.nom} » ({article.reference}) modifié avec succès.", 'success')
+  return redirect(url_for('pages_articles'))
+
+@app.route('/pages/articles/<int:article_id>/archiver', methods=['POST'])
+@roles_required('Gestionnaire de stock', 'Administrateur')
+def archiver_article_vue(article_id):
+  acteur = get_user_by_identifiant(session.get('identifiant'))
+  try:
+    article = archiver_article(article_id, acteur=acteur)
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_articles'))
+  flash(f"Article « {article.nom} » ({article.reference}) archivé. "
+        f"Il n'apparaît plus dans les listes et n'accepte plus de mouvements.", 'success')
   return redirect(url_for('pages_articles'))
 
 def _article_courant_ou_404():

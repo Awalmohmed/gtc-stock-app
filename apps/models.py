@@ -227,6 +227,8 @@ ACTIONS_JOURNAL = {
     "reinit_mot_de_passe": ("Réinitialisation mot de passe", "warning"),
     "entree_stock": ("Entrée de stock", "success"),
     "sortie_stock": ("Sortie de stock", "danger"),
+    "archive_article": ("Archivage article", "secondary"),
+    "desarchive_article": ("Désarchivage article", "secondary"),
 }
 
 

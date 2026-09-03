@@ -45,10 +45,14 @@
           <td>{{ a.magasin.nom if a.magasin else '—' }}</td>
           <td>{{ a.fournisseur.nom if a.fournisseur else '—' }}</td>
           {% if peut_gerer %}
-          <td class="text-end" onclick="event.stopPropagation()">
+          <td class="text-end text-nowrap" onclick="event.stopPropagation()">
             <button type="button" class="btn btn-sm btn-outline-secondary" title="Modifier l'article"
                     data-bs-toggle="modal" data-bs-target="#modalModifierArticle{{ a.id }}">
               <i class="bi bi-pencil"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" title="Archiver l'article"
+                    data-bs-toggle="modal" data-bs-target="#modalArchiverArticle{{ a.id }}">
+              <i class="bi bi-trash"></i>
             </button>
           </td>
           {% endif %}
@@ -120,6 +124,40 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalArchiverArticle{{ a.id }}" tabindex="-1"
+     aria-labelledby="titreArchiverArticle{{ a.id }}" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('archiver_article_vue', article_id=a.id) }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="titreArchiverArticle{{ a.id }}">Archiver l'article</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Archiver <strong>{{ a.nom }}</strong> ({{ a.reference }}) ?</p>
+          <p class="text-muted small mb-0">
+            Il sortira de la liste des articles, de la fiche de stock et des saisies
+            d'entrée/sortie, et n'acceptera plus aucun mouvement. Son historique est conservé
+            et un administrateur pourra le désarchiver.
+          </p>
+          {% if a.quantite > 0 %}
+          <div class="alert alert-warning small mt-3 mb-0">
+            <i class="bi bi-exclamation-triangle"></i>
+            Cet article a encore <strong>{{ a.quantite }}</strong> unité(s) en stock : cette
+            quantité restera figée en l'état.
+          </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-danger">Archiver l'article</button>
         </div>
       </form>
     </div>
