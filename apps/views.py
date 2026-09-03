@@ -16,7 +16,8 @@ from apps.gtc_data import (
   add_entree, add_sortie, get_all_users, get_rapprochement,
   get_all_fournisseurs, add_fournisseur, get_journal, get_alertes,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
-  maj_magasin, add_article, maj_article, archiver_article,
+  maj_magasin, add_article, maj_article, archiver_article, desarchiver_article,
+  get_articles_archives,
   verify_credentials, add_user, maj_utilisateur, basculer_statut_utilisateur,
   reinitialiser_mot_de_passe, get_user_by_identifiant,
 )
@@ -167,8 +168,13 @@ def creer_article():
 @app.route('/pages/articles/')
 @login_required
 def pages_articles():
+  # Vue « articles archivés » réservée à l'administrateur ; pour tout
+  # autre rôle le paramètre est ignoré (liste normale).
+  vue_archives = request.args.get('archives') == '1' and session.get('role') == 'Administrateur'
+  archives = get_articles_archives()
   return render_template('pages/articles.html', segment='articles', parent='pages',
-                          articles=get_all_articles(),
+                          articles=archives if vue_archives else get_all_articles(),
+                          vue_archives=vue_archives, nb_archives=len(archives),
                           fournisseurs=get_all_fournisseurs(), magasins=get_all_magasins())
 
 @app.route('/pages/articles/<int:article_id>/modifier', methods=['POST'])
@@ -205,6 +211,19 @@ def archiver_article_vue(article_id):
   flash(f"Article « {article.nom} » ({article.reference}) archivé. "
         f"Il n'apparaît plus dans les listes et n'accepte plus de mouvements.", 'success')
   return redirect(url_for('pages_articles'))
+
+@app.route('/pages/articles/<int:article_id>/desarchiver', methods=['POST'])
+@admin_required
+def desarchiver_article_vue(article_id):
+  acteur = get_user_by_identifiant(session.get('identifiant'))
+  try:
+    article = desarchiver_article(article_id, acteur=acteur)
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_articles', archives=1))
+  flash(f"Article « {article.nom} » ({article.reference}) désarchivé : "
+        f"il réapparaît dans les listes et accepte de nouveau des mouvements.", 'success')
+  return redirect(url_for('pages_articles', archives=1))
 
 def _article_courant_ou_404():
   """Article ciblé par ?article=<id> (ou le premier disponible), pour

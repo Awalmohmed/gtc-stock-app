@@ -589,6 +589,23 @@ def archiver_article(article_id, acteur=None):
     return article
 
 
+def desarchiver_article(article_id, acteur=None):
+    """Réactive un article archivé : il réapparaît dans les vues et
+    accepte de nouveau des mouvements. Réservé à l'administrateur
+    (contrôlé par la route). Lève ValueError si l'article est introuvable
+    ou hors périmètre, ou s'il n'est pas archivé."""
+    article = db.session.get(Article, article_id)
+    if article is None or not _article_visible(article):
+        raise ValueError("Article introuvable.")
+    if not article.archive:
+        raise ValueError("Cet article n'est pas archivé.")
+    article.archive = False
+    _journaliser(acteur, "desarchive_article",
+                 f"Désarchivage de l'article « {article.nom} » ({article.reference}).")
+    db.session.commit()
+    return article
+
+
 def _article_mouvementable(article_id):
     """Article visible ET non archivé, pour add_entree / add_sortie.
     Lève ValueError avec un message distinct selon le cas : introuvable /
