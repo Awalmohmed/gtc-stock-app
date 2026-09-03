@@ -3,6 +3,7 @@
 GTC Stock — Modèles de base de données (SQLAlchemy).
 """
 
+import sqlalchemy as sa
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from apps import db
@@ -140,6 +141,13 @@ class Article(db.Model):
     # pas encore automatique (voir apps/sage_connector.py).
     sage_quantite = db.Column(db.Integer, nullable=True)
     dernier_mouvement = db.Column(db.String(20), nullable=True, default="—")
+    # Archivage (suppression douce) : un article archivé est conservé en
+    # base — avec tout son historique de mouvements — mais retiré de
+    # toutes les vues opérationnelles (liste, fiche de stock, saisies,
+    # dashboard, alertes, rapprochement) et ne peut plus être mouvementé.
+    # Réversible via « désarchiver ». On ne supprime jamais vraiment un
+    # article pour préserver l'historique et le rapprochement comptable.
+    archive = db.Column(db.Boolean, nullable=False, default=False, server_default=sa.false())
     # Fournisseur habituel/par défaut de cet article (catalogue) — distinct
     # du fournisseur d'une livraison précise (voir Entree.fournisseur_id).
     # Alimenté notamment par l'import de fichier (apps/import_articles.py).
