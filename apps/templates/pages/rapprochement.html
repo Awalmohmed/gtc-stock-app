@@ -52,7 +52,6 @@
           <th>Quantité Sage 100</th>
           <th>Écart</th>
           <th>Statut</th>
-          <th>Conformité</th>
         </tr>
       </thead>
       <tbody>
@@ -68,12 +67,6 @@
             {% else %}
             <span class="badge bg-danger-subtle text-danger">Écart détecté</span>
             {% endif %}
-          </td>
-          {# Colonne « Conformité » : couleur pleine + libellé, cohérente avec l'export PDF.
-             Le texte reste lisible même sans couleur (impression noir et blanc). #}
-          <td class="text-center fw-semibold {% if r.conforme %}bg-success text-white{% else %}bg-danger text-white{% endif %}"
-              style="print-color-adjust: exact; -webkit-print-color-adjust: exact;">
-            {% if r.conforme %}Conforme{% else %}Écart{% endif %}
           </td>
         </tr>
         {% endfor %}
