@@ -17,7 +17,7 @@ from apps.gtc_data import (
   get_all_fournisseurs, add_fournisseur, get_journal, get_alertes, traiter_alerte,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
   maj_magasin, add_article, maj_article, archiver_article, desarchiver_article,
-  get_articles_archives,
+  supprimer_definitivement_article, get_articles_archives,
   verify_credentials, add_user, maj_utilisateur, basculer_statut_utilisateur,
   reinitialiser_mot_de_passe, get_user_by_identifiant,
 )
@@ -229,6 +229,20 @@ def desarchiver_article_vue(article_id):
     return redirect(url_for('pages_articles', archives=1))
   flash(f"Article « {article.nom} » ({article.reference}) désarchivé : "
         f"il réapparaît dans les listes et accepte de nouveau des mouvements.", 'success')
+  return redirect(url_for('pages_articles', archives=1))
+
+@app.route('/pages/articles/<int:article_id>/supprimer', methods=['POST'])
+@admin_required
+def supprimer_definitivement_article_vue(article_id):
+  acteur = get_user_by_identifiant(session.get('identifiant'))
+  try:
+    info = supprimer_definitivement_article(article_id, acteur=acteur)
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_articles', archives=1))
+  flash(f"Article « {info['nom']} » ({info['reference']}) supprimé définitivement, "
+        f"avec son historique ({info['nb_entrees']} entrée(s), {info['nb_sorties']} sortie(s)).",
+        'success')
   return redirect(url_for('pages_articles', archives=1))
 
 def _article_courant_ou_404():

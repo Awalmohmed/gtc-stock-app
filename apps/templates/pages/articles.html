@@ -1,3 +1,18 @@
+{#
+  Catalogue des articles — route pages_articles (GET /pages/articles/), tout rôle connecté.
+  ?archives=1 (Administrateur seulement) -> vue « articles archivés ».
+  Reçoit : articles, vue_archives, nb_archives, fournisseurs, magasins.
+  Sections : 1) barre d'outils (bascule actifs/archivés + recherche live) ;
+  2) tableau des articles (colonne Actions selon le rôle) ;
+  3) modales par article : modifier (POST modifier_article) / archiver
+  (POST archiver_article_vue) / désarchiver (POST desarchiver_article_vue, admin) /
+  supprimer définitivement (POST supprimer_definitivement_article_vue, admin,
+  uniquement dans la vue archivés — suppression réelle et irréversible,
+  avec avertissement explicite dans la modale de confirmation).
+  Le bloc extra_js en bas = filtrage instantané côté navigateur via
+  data-recherche="<nom + reference en minuscules>" (confort, aucune sécurité).
+  peut_gerer / est_admin / colonnes = raccourcis d'affichage.
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Articles{% endblock title %}
@@ -60,10 +75,14 @@
           <td>{{ a.magasin.nom if a.magasin else '—' }}</td>
           <td>{{ a.fournisseur.nom if a.fournisseur else '—' }}</td>
           {% if vue_archives %}
-          <td class="text-end">
+          <td class="text-end text-nowrap">
             <button type="button" class="btn btn-sm btn-outline-primary" title="Désarchiver l'article"
                     data-bs-toggle="modal" data-bs-target="#modalDesarchiverArticle{{ a.id }}">
               <i class="bi bi-box-arrow-up"></i> Désarchiver
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" title="Supprimer définitivement l'article"
+                    data-bs-toggle="modal" data-bs-target="#modalSupprimerArticle{{ a.id }}">
+              <i class="bi bi-trash3"></i> Supprimer définitivement
             </button>
           </td>
           {% elif peut_gerer %}
@@ -112,6 +131,35 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
           <button type="submit" class="btn btn-primary">Désarchiver l'article</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalSupprimerArticle{{ a.id }}" tabindex="-1"
+     aria-labelledby="titreSupprimerArticle{{ a.id }}" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('supprimer_definitivement_article_vue', article_id=a.id) }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="titreSupprimerArticle{{ a.id }}">Supprimer définitivement l'article</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Supprimer définitivement <strong>{{ a.nom }}</strong> ({{ a.reference }}) ?</p>
+          <div class="alert alert-danger small mb-0">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            Cette action est irréversible. La suppression de cet article effacera aussi
+            définitivement tout son historique de mouvements (entrées, sorties) et ses
+            éventuels rapprochements associés. Cette suppression ne peut pas être annulée.
+            Voulez-vous vraiment continuer ?
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-danger">Supprimer définitivement</button>
         </div>
       </form>
     </div>

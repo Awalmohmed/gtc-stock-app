@@ -229,6 +229,7 @@ ACTIONS_JOURNAL = {
     "sortie_stock": ("Sortie de stock", "danger"),
     "archive_article": ("Archivage article", "secondary"),
     "desarchive_article": ("Désarchivage article", "secondary"),
+    "suppression_article": ("Suppression définitive article", "danger"),
     "traiter_alerte": ("Alerte traitée", "success"),
 }
 

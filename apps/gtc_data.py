@@ -615,6 +615,35 @@ def desarchiver_article(article_id, acteur=None):
     return article
 
 
+def supprimer_definitivement_article(article_id, acteur=None):
+    """Supprime DÉFINITIVEMENT un article déjà archivé, avec tout son
+    historique de mouvements (entrées, sorties) — action irréversible,
+    réservée à l'administrateur (contrôlé par la route). À la différence
+    d'archiver_article (suppression douce, réversible), la ligne
+    disparaît vraiment de la base : à réserver aux cas où l'historique
+    n'a plus besoin d'être conservé (le rapprochement Sage 100 n'étant
+    pas encore une table dédiée — voir get_rapprochement — il n'y a pas
+    d'autre donnée liée à purger explicitement). Lève ValueError si
+    l'article est introuvable, hors périmètre, ou pas archivé (on ne
+    supprime définitivement qu'un article déjà mis de côté, jamais un
+    article encore actif)."""
+    article = db.session.get(Article, article_id)
+    if article is None or not _article_visible(article):
+        raise ValueError("Article introuvable.")
+    if not article.archive:
+        raise ValueError("Seul un article archivé peut être supprimé définitivement.")
+
+    nom, reference = article.nom, article.reference
+    nb_entrees = Entree.query.filter_by(article_id=article.id).delete()
+    nb_sorties = Sortie.query.filter_by(article_id=article.id).delete()
+    db.session.delete(article)
+    _journaliser(acteur, "suppression_article",
+                 f"Suppression définitive de l'article « {nom} » ({reference}) "
+                 f"— {nb_entrees} entrée(s) et {nb_sorties} sortie(s) supprimées avec lui.")
+    db.session.commit()
+    return {"nom": nom, "reference": reference, "nb_entrees": nb_entrees, "nb_sorties": nb_sorties}
+
+
 def _article_mouvementable(article_id):
     """Article visible ET non archivé, pour add_entree / add_sortie.
     Lève ValueError avec un message distinct selon le cas : introuvable /
