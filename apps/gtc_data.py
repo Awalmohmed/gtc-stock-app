@@ -418,13 +418,20 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
     }
 
 
-def get_mouvements():
-    """Mouvements (entrées + sorties) des articles du magasin courant,
-    du plus récent au plus ancien — pour la page Entrées/Sorties."""
+def get_entrees():
+    """Entrées de stock des articles du magasin courant, de la plus
+    récente à la plus ancienne — pour la page Entrées de stock."""
     entrees = _filtrer_articles(Entree.query.join(Article)).all()
-    sorties = _filtrer_articles(Sortie.query.join(Article)).all()
     lignes = [_mouvement_vers_dict(e, "Entrée", "+") for e in entrees]
-    lignes += [_mouvement_vers_dict(s, "Sortie", "-") for s in sorties]
+    lignes.sort(key=lambda m: (m["date_tri"], m["id_tri"]), reverse=True)
+    return lignes
+
+
+def get_sorties():
+    """Sorties de stock des articles du magasin courant, de la plus
+    récente à la plus ancienne — pour la page Sorties de stock."""
+    sorties = _filtrer_articles(Sortie.query.join(Article)).all()
+    lignes = [_mouvement_vers_dict(s, "Sortie", "-") for s in sorties]
     lignes.sort(key=lambda m: (m["date_tri"], m["id_tri"]), reverse=True)
     return lignes
 

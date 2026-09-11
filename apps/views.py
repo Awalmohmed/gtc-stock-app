@@ -12,7 +12,7 @@ from jinja2  import TemplateNotFound
 # App modules
 from apps import app, db
 from apps.gtc_data import (
-  get_stats, get_all_articles, get_article, get_historique, get_mouvements,
+  get_stats, get_all_articles, get_article, get_historique, get_entrees, get_sorties,
   add_entree, add_sortie, get_all_users, get_rapprochement,
   get_all_fournisseurs, add_fournisseur, get_journal, get_alertes, traiter_alerte,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
@@ -73,12 +73,18 @@ def pages_dashboard():
 
 # Pages -- GTC Stock
 
-@app.route('/pages/entrees-sorties/')
+@app.route('/pages/entrees/')
 @login_required
-def pages_entrees_sorties():
-  return render_template('pages/entrees_sorties.html', segment='entrees_sorties', parent='pages',
-                          articles=get_all_articles(), mouvements=get_mouvements(),
+def pages_entrees():
+  return render_template('pages/entrees.html', segment='entrees', parent='pages',
+                          articles=get_all_articles(), mouvements=get_entrees(),
                           fournisseurs=get_all_fournisseurs())
+
+@app.route('/pages/sorties/')
+@login_required
+def pages_sorties():
+  return render_template('pages/sorties.html', segment='sorties', parent='pages',
+                          articles=get_all_articles(), mouvements=get_sorties())
 
 def _parser_date_formulaire(valeur):
   """Convertit la date d'un <input type="date"> (format AAAA-MM-JJ) en
@@ -88,7 +94,7 @@ def _parser_date_formulaire(valeur):
   except (TypeError, ValueError):
     raise ValueError("Merci d'indiquer une date valide.")
 
-@app.route('/pages/entrees-sorties/nouvelle-entree', methods=['POST'])
+@app.route('/pages/entrees/nouvelle', methods=['POST'])
 @login_required
 def creer_entree():
   utilisateur = get_user_by_identifiant(session.get('identifiant'))
@@ -103,11 +109,11 @@ def creer_entree():
     add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, utilisateur)
   except ValueError as e:
     flash(str(e), 'danger')
-    return redirect(url_for('pages_entrees_sorties'))
+    return redirect(url_for('pages_entrees'))
   flash("Entrée de stock enregistrée avec succès.", 'success')
-  return redirect(url_for('pages_entrees_sorties'))
+  return redirect(url_for('pages_entrees'))
 
-@app.route('/pages/entrees-sorties/nouvelle-sortie', methods=['POST'])
+@app.route('/pages/sorties/nouvelle', methods=['POST'])
 @login_required
 def creer_sortie():
   utilisateur = get_user_by_identifiant(session.get('identifiant'))
@@ -122,9 +128,9 @@ def creer_sortie():
     add_sortie(article_id, date_mouvement, quantite, type_document, reference, utilisateur)
   except ValueError as e:
     flash(str(e), 'danger')
-    return redirect(url_for('pages_entrees_sorties'))
+    return redirect(url_for('pages_sorties'))
   flash("Sortie de stock enregistrée avec succès.", 'success')
-  return redirect(url_for('pages_entrees_sorties'))
+  return redirect(url_for('pages_sorties'))
 
 @app.route('/pages/fiche-stock/')
 @login_required
