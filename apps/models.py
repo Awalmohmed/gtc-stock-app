@@ -229,6 +229,7 @@ ACTIONS_JOURNAL = {
     "sortie_stock": ("Sortie de stock", "danger"),
     "archive_article": ("Archivage article", "secondary"),
     "desarchive_article": ("Désarchivage article", "secondary"),
+    "traiter_alerte": ("Alerte traitée", "success"),
 }
 
 
@@ -263,3 +264,32 @@ class JournalActivite(db.Model):
     @property
     def action_classe(self):
         return ACTIONS_JOURNAL.get(self.action, (self.action, "secondary"))[1]
+
+
+class Alerte(db.Model):
+    """Alerte de suivi de stock — écart de rapprochement avec Sage 100
+    ou seuil critique atteint (voir /pages/alertes/). Peut être marquée
+    comme traitée (bouton « Marquer comme traitée » ; voir
+    apps/gtc_data.py, traiter_alerte), ce qui journalise l'action."""
+
+    __tablename__ = "alertes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    titre = db.Column(db.String(255), nullable=False)
+    detail = db.Column(db.String(255), nullable=False)
+    # Date d'affichage déjà formatée (pas encore de génération
+    # automatique horodatée pour ces alertes — voir le docstring de
+    # get_alertes dans apps/gtc_data.py).
+    date = db.Column(db.String(50), nullable=False)
+    # "ecart" (écart de rapprochement) ou "seuil" (seuil critique atteint).
+    type = db.Column(db.String(20), nullable=False)
+    icone = db.Column(db.String(50), nullable=False)
+    traitee = db.Column(db.Boolean, nullable=False, default=False, server_default=sa.false())
+    # Magasin concerné, pour le filtrage par périmètre courant (voir
+    # apps/gtc_data.py, _scope_magasin) — NULL si pas encore rattaché.
+    magasin_id = db.Column(db.Integer, db.ForeignKey("magasins.id"), nullable=True)
+
+    magasin = db.relationship("Magasin", backref="alertes")
+
+    def __repr__(self):
+        return f"<Alerte {self.titre!r} traitee={self.traitee}>"

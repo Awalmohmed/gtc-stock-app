@@ -2,10 +2,10 @@
 """
 GTC Stock — Données d'exemple et accès aux données.
 
-Les rapprochements et alertes ci-dessous restent des données factices
-en mémoire (pas encore de base de données pour ces objets métier).
-Les comptes utilisateurs, articles, entrées et sorties de stock sont
-en revanche stockés dans une vraie base SQLite via SQLAlchemy (voir
+Le rapprochement ci-dessous reste une donnée factice en mémoire (pas
+encore de base de données pour cet objet métier). Les comptes
+utilisateurs, articles, entrées/sorties de stock et alertes sont en
+revanche stockés dans une vraie base SQLite via SQLAlchemy (voir
 apps/models.py et apps/config.py).
 """
 
@@ -19,7 +19,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from apps import db
 from apps.models import (
     Utilisateur, Article, Entree, Sortie, Fournisseur, JournalActivite,
-    Magasin, ROLE_CLASSES, ROLES_TOUS_MAGASINS,
+    Magasin, Alerte, ROLE_CLASSES, ROLES_TOUS_MAGASINS,
 )
 from apps import sage_connector
 from apps import mailer
@@ -85,6 +85,27 @@ def _article_visible(article):
         return True
     if mode == "magasin":
         return article.magasin_id == magasin_id
+    return False
+
+
+def _filtrer_alertes(query):
+    """Restreint une requête sur Alerte au périmètre magasin courant
+    (même logique que _filtrer_articles)."""
+    mode, magasin_id = _scope_magasin()
+    if mode == "magasin":
+        return query.filter(Alerte.magasin_id == magasin_id)
+    if mode == "aucun":
+        return query.filter(sa_false())
+    return query
+
+
+def _alerte_visible(alerte):
+    """True si `alerte` est dans le périmètre magasin courant."""
+    mode, magasin_id = _scope_magasin()
+    if mode == "tous":
+        return True
+    if mode == "magasin":
+        return alerte.magasin_id == magasin_id
     return False
 
 
@@ -237,43 +258,9 @@ RAPPROCHEMENT = [
 ]
 
 # ---------------------------------------------------------------------
-# Alertes (écarts de rapprochement + seuils critiques)
-# ---------------------------------------------------------------------
-ALERTES = [
-    {
-        "titre": "Écart de rapprochement — Classeur A4",
-        "detail": "Quantité application : 8 — Quantité Sage 100 : 11 (écart de -3)",
-        "date": "24/08/2026 à 07:12",
-        "type": "ecart",
-        "icone": "bi-shield-exclamation",
-        "traitee": False,
-    },
-    {
-        "titre": "Écart de rapprochement — Stylo bille bleu (boîte)",
-        "detail": "Quantité application : 96 — Quantité Sage 100 : 90 (écart de +6)",
-        "date": "24/08/2026 à 07:12",
-        "type": "ecart",
-        "icone": "bi-shield-exclamation",
-        "traitee": False,
-    },
-    {
-        "titre": "Seuil critique atteint — Rame de papier A4",
-        "detail": "Quantité actuelle : 5 — Seuil d'alerte : 10",
-        "date": "22/08/2026 à 16:40",
-        "type": "seuil",
-        "icone": "bi-exclamation-triangle",
-        "traitee": True,
-    },
-    {
-        "titre": "Seuil critique atteint — Classeur A4",
-        "detail": "Quantité actuelle : 8 — Seuil d'alerte : 15",
-        "date": "21/08/2026 à 09:05",
-        "type": "seuil",
-        "icone": "bi-exclamation-triangle",
-        "traitee": False,
-    },
-]
-
+# Alertes (écarts de rapprochement + seuils critiques) : voir la classe
+# Alerte (apps/models.py) — stockées en base, alimentées par la
+# migration alertes (données de démonstration initiales).
 # ---------------------------------------------------------------------
 # Comptes utilisateurs (vue administrateur)
 #
@@ -373,8 +360,8 @@ def get_rapprochement():
 
 
 def _lignes_demo_visibles(lignes, nom_article, inclure_archives=False):
-    """Filtre une liste de dictionnaires de démonstration (RAPPROCHEMENT,
-    ALERTES) sur le magasin courant, au mieux : une ligne est conservée
+    """Filtre une liste de dictionnaires de démonstration (RAPPROCHEMENT)
+    sur le magasin courant, au mieux : une ligne est conservée
     si le nom d'article qu'elle mentionne (extrait par `nom_article`,
     qui peut renvoyer le nom exact ou un libellé qui le contient)
     correspond à un article visible. `lignes` est renvoyée telle quelle
@@ -392,11 +379,26 @@ def _lignes_demo_visibles(lignes, nom_article, inclure_archives=False):
 
 
 def get_alertes():
-    """Alertes de démonstration limitées au magasin courant (voir
-    _lignes_demo_visibles). Les alertes en dur ne sont pas encore
-    rattachées à un magasin en base : le rapprochement se fait sur le
-    nom d'article cité dans le titre."""
-    return _lignes_demo_visibles(ALERTES, lambda al: al["titre"])
+    """Alertes du magasin courant (voir _filtrer_alertes), non traitées
+    d'abord, les plus récentes en tête de chaque groupe."""
+    return _filtrer_alertes(Alerte.query).order_by(
+        Alerte.traitee.asc(), Alerte.id.desc()
+    ).all()
+
+
+def traiter_alerte(alerte_id, acteur=None):
+    """Marque une alerte comme traitée (bouton « Marquer comme traitée »
+    de la page Alertes). Lève ValueError si l'alerte est introuvable,
+    hors périmètre, ou déjà traitée."""
+    alerte = db.session.get(Alerte, alerte_id)
+    if alerte is None or not _alerte_visible(alerte):
+        raise ValueError("Alerte introuvable.")
+    if alerte.traitee:
+        raise ValueError("Cette alerte est déjà traitée.")
+    alerte.traitee = True
+    _journaliser(acteur, "traiter_alerte", f"Alerte traitée : « {alerte.titre} ».")
+    db.session.commit()
+    return alerte
 
 
 def _mouvement_vers_dict(mouvement, type_libelle, signe):

@@ -1,3 +1,12 @@
+{#
+  Alertes — route pages_alertes (GET /pages/alertes/), tout rôle connecté.
+  Reçoit : alertes (get_alertes) — table Alerte (apps/models.py), filtrée
+  au magasin courant (voir apps/gtc_data.py, _filtrer_alertes).
+  Sections : 1) onglets Toutes / Écarts de rapprochement / Seuils critiques
+  (compteurs calculés dans le gabarit avec selectattr) ; 2) liste des alertes,
+  chacune avec un bouton « Marquer comme traitée » (POST vers
+  traiter_alerte_vue) tant qu'elle n'est pas déjà traitée.
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Alertes{% endblock title %}
@@ -36,7 +45,10 @@
         <button class="btn btn-sm btn-outline-secondary" disabled>Marquer comme traitée</button>
         {% else %}
         <span class="badge bg-danger-subtle text-danger mb-2 d-block">Non traitée</span>
-        <button class="btn btn-sm btn-outline-secondary">Marquer comme traitée</button>
+        <form action="{{ url_for('traiter_alerte_vue', alerte_id=al.id) }}" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-sm btn-outline-secondary">Marquer comme traitée</button>
+        </form>
         {% endif %}
       </div>
     </div>

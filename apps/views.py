@@ -14,7 +14,7 @@ from apps import app, db
 from apps.gtc_data import (
   get_stats, get_all_articles, get_article, get_historique, get_mouvements,
   add_entree, add_sortie, get_all_users, get_rapprochement,
-  get_all_fournisseurs, add_fournisseur, get_journal, get_alertes,
+  get_all_fournisseurs, add_fournisseur, get_journal, get_alertes, traiter_alerte,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
   maj_magasin, add_article, maj_article, archiver_article, desarchiver_article,
   get_articles_archives,
@@ -339,6 +339,18 @@ def export_rapprochement_excel():
 def pages_alertes():
   return render_template('pages/alertes.html', segment='alertes', parent='pages',
                           alertes=get_alertes())
+
+@app.route('/pages/alertes/<int:alerte_id>/traiter', methods=['POST'])
+@login_required
+def traiter_alerte_vue(alerte_id):
+  acteur = get_user_by_identifiant(session.get('identifiant'))
+  try:
+    traiter_alerte(alerte_id, acteur=acteur)
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_alertes'))
+  flash("Alerte marquée comme traitée.", 'success')
+  return redirect(url_for('pages_alertes'))
 
 @app.route('/pages/utilisateurs/')
 @login_required
