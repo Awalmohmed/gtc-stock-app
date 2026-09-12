@@ -9,6 +9,7 @@ chiffres (trier, filtrer, recalculer) dans un tableur.
 
 import io
 from datetime import datetime
+from xml.sax.saxutils import escape as _echapper_xml
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -18,9 +19,12 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 _STYLES = getSampleStyleSheet()
+_STYLE_CELLULE_JOURNAL = ParagraphStyle(
+    "CelluleJournal", parent=_STYLES["Normal"], fontSize=8, leading=10,
+)
 
 
 def _horodatage():
@@ -31,8 +35,11 @@ def _horodatage():
 # PDF — mise en page commune (titre + sous-titre + un ou plusieurs tableaux)
 # ---------------------------------------------------------------------
 def _construire_pdf(titre, sous_titre, tableaux):
-    """tableaux : liste de (legende_ou_None, liste_de_lignes) ; la
-    première ligne de chaque liste est traitée comme l'en-tête."""
+    """tableaux : liste de (legende_ou_None, liste_de_lignes[, largeurs_colonnes])
+    — le 3e élément est optionnel (None par défaut = largeurs automatiques,
+    utilisé quand une colonne doit être forcée, ex. une description longue
+    mise en forme avec Paragraph pour l'export du journal). La première
+    ligne de chaque liste est traitée comme l'en-tête."""
     tampon = io.BytesIO()
     doc = SimpleDocTemplate(
         tampon, pagesize=A4,
@@ -43,10 +50,12 @@ def _construire_pdf(titre, sous_titre, tableaux):
         Paragraph(sous_titre, _STYLES["Normal"]),
         Spacer(1, 0.5 * cm),
     ]
-    for legende, lignes in tableaux:
+    for item in tableaux:
+        legende, lignes = item[0], item[1]
+        largeurs_colonnes = item[2] if len(item) > 2 else None
         if legende:
             elements.append(Paragraph(legende, _STYLES["Heading3"]))
-        table = Table(lignes, repeatRows=1)
+        table = Table(lignes, repeatRows=1, colWidths=largeurs_colonnes)
         table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1b2559")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -163,3 +172,38 @@ def rapprochement_excel(lignes, sage_connecte):
         for l in lignes
     ]
     return _construire_excel("Rapprochement", entetes, donnees)
+
+
+# ---------------------------------------------------------------------
+# Journal d'activité (audit log) — export complet avant purge (voir
+# gtc_data.vider_journal) ou simple consultation imprimable.
+# ---------------------------------------------------------------------
+def journal_pdf(journal):
+    """La colonne Description est mise en forme avec Paragraph (et des
+    largeurs de colonnes fixes) pour ne pas être tronquée : contrairement
+    aux autres exports, ces descriptions peuvent être assez longues."""
+    lignes = [["Horodatage", "Identifiant", "Action", "Description"]]
+    lignes += [
+        [
+            j.horodatage.strftime("%d/%m/%Y %H:%M"),
+            j.identifiant or "—",
+            j.action_libelle,
+            Paragraph(_echapper_xml(j.description), _STYLE_CELLULE_JOURNAL),
+        ]
+        for j in journal
+    ] or [["Aucune entrée.", "", "", ""]]
+
+    return _construire_pdf(
+        "Journal d'activité — GTC Stock",
+        f"Export complet généré le {_horodatage()} — {len(journal)} entrée(s)",
+        [(None, lignes, [3.3 * cm, 3 * cm, 3.3 * cm, 8.2 * cm])],
+    )
+
+
+def journal_excel(journal):
+    entetes = ["Horodatage", "Identifiant", "Action", "Description"]
+    donnees = [
+        [j.horodatage.strftime("%d/%m/%Y %H:%M"), j.identifiant or "—", j.action_libelle, j.description]
+        for j in journal
+    ]
+    return _construire_excel("Journal", entetes, donnees)

@@ -1,3 +1,16 @@
+{#
+  Journal d'activité (audit log) — route pages_journal (GET /pages/journal/),
+  ADMINISTRATEUR seulement (@admin_required). Reçoit : journal = get_journal()
+  -> toutes les lignes JournalActivite, de la plus récente à la plus ancienne.
+  Tableau en lecture seule : horodatage, identifiant (copié au moment de
+  l'action, donc lisible même si le compte disparaît), badge d'action
+  (action_libelle / action_classe), description. Alimenté par _journaliser()
+  dans gtc_data.py (connexions, CRUD utilisateurs, mouvements, archivage...).
+  Bouton « Exporter et vider le journal » -> modale de confirmation -> POST
+  exporter_et_vider_journal_pdf / _excel : génère l'export complet (voir
+  exports.journal_pdf/_excel) puis, seulement s'il a réussi, vide le journal
+  et y ajoute une entrée de traçabilité (gtc_data.vider_journal).
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Journal d'activité{% endblock title %}
@@ -8,7 +21,15 @@
 <div class="card table-card p-3">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h6 class="mb-0">Historique des actions</h6>
-    <span class="text-muted small">{{ journal|length }} entrée(s)</span>
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-muted small">{{ journal|length }} entrée(s)</span>
+      {% if journal %}
+      <button type="button" class="btn btn-outline-danger btn-sm"
+              data-bs-toggle="modal" data-bs-target="#modalExporterViderJournal">
+        <i class="bi bi-archive"></i> Exporter et vider le journal
+      </button>
+      {% endif %}
+    </div>
   </div>
   <div class="table-responsive">
     <table class="table align-middle">
@@ -35,5 +56,45 @@
     </table>
   </div>
 </div>
+
+{% if journal %}
+<div class="modal fade" id="modalExporterViderJournal" tabindex="-1"
+     aria-labelledby="titreExporterViderJournal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="titreExporterViderJournal">Exporter et vider le journal</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">
+            Cette action va télécharger un export complet du journal actuel (PDF ou Excel),
+            puis vider le journal dans l'application. Voulez-vous continuer ?
+          </p>
+          <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle"></i>
+            Si l'export échoue pour une raison quelconque, le journal n'est pas vidé.
+            Une entrée de traçabilité (qui, quand, {{ journal|length }} entrée(s) archivée(s))
+            est ajoutée automatiquement juste après le vidage.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" formaction="{{ url_for('exporter_et_vider_journal_excel') }}"
+                  class="btn btn-outline-secondary">
+            <i class="bi bi-file-earmark-excel"></i> Excel puis vider
+          </button>
+          <button type="submit" formaction="{{ url_for('exporter_et_vider_journal_pdf') }}"
+                  class="btn btn-danger">
+            <i class="bi bi-file-earmark-pdf"></i> PDF puis vider
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {% endblock content %}

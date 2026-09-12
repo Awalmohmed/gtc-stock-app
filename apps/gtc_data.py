@@ -223,6 +223,24 @@ def get_journal():
         JournalActivite.horodatage.desc(), JournalActivite.id.desc()
     ).all()
 
+
+def vider_journal(acteur):
+    """Vide le journal d'activité — à n'appeler qu'une fois l'export
+    complet déjà généré avec succès (voir views._exporter_et_vider_journal,
+    qui garantit cet ordre et n'appelle jamais cette fonction si la
+    génération de l'export a échoué : on ne veut jamais perdre des lignes
+    du journal sans archive correspondante).
+    Supprime toutes les entrées existantes puis ajoute une unique entrée
+    de traçabilité (qui a purgé, quand, combien de lignes) : il n'y a donc
+    jamais de trou total dans l'audit log, même juste après une purge."""
+    nb = JournalActivite.query.delete()
+    _journaliser(
+        acteur, "purge_journal",
+        f"Journal d'activité vidé après export complet — {nb} entrée(s) archivée(s) puis supprimée(s).",
+    )
+    db.session.commit()
+    return nb
+
 # ---------------------------------------------------------------------
 # Articles, entrées et sorties de stock
 #

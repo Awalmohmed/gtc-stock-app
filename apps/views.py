@@ -14,7 +14,7 @@ from apps import app, db
 from apps.gtc_data import (
   get_stats, get_all_articles, get_article, get_historique, get_entrees, get_sorties,
   add_entree, add_sortie, get_all_users, get_rapprochement,
-  get_all_fournisseurs, add_fournisseur, get_journal, get_alertes, traiter_alerte,
+  get_all_fournisseurs, add_fournisseur, get_journal, vider_journal, get_alertes, traiter_alerte,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
   maj_magasin, add_article, maj_article, archiver_article, desarchiver_article,
   supprimer_definitivement_article, get_articles_archives,
@@ -479,6 +479,51 @@ def modifier_magasin(magasin_id):
 def pages_journal():
   return render_template('pages/journal.html', segment='journal', parent='pages',
                           journal=get_journal())
+
+def _exporter_et_vider_journal(format_export):
+  """Étape commune aux deux routes ci-dessous : génère D'ABORD l'export
+  complet du journal, et ne le vide QUE si cette génération a réussi —
+  si elle échoue pour une raison quelconque (bibliothèque d'export,
+  encodage...), rien n'est supprimé. Ajoute ensuite une entrée de
+  traçabilité (voir gtc_data.vider_journal) pour ne jamais laisser de
+  trou total dans l'audit log."""
+  journal = get_journal()
+  if not journal:
+    flash("Le journal est déjà vide : rien à exporter.", 'warning')
+    return redirect(url_for('pages_journal'))
+
+  nom_fichier = f"journal_activite_{datetime.now().strftime('%Y-%m-%d')}.{format_export}"
+  try:
+    if format_export == 'pdf':
+      contenu = exports.journal_pdf(journal)
+      mimetype = 'application/pdf'
+    else:
+      contenu = exports.journal_excel(journal)
+      mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  except Exception:
+    flash("Échec de la génération de l'export : le journal n'a PAS été vidé.", 'danger')
+    return redirect(url_for('pages_journal'))
+
+  acteur = get_user_by_identifiant(session.get('identifiant'))
+  try:
+    nb = vider_journal(acteur)
+  except Exception:
+    flash("Échec du vidage du journal après export : aucune entrée n'a été supprimée.", 'danger')
+    return redirect(url_for('pages_journal'))
+
+  flash(f"Journal exporté et vidé ({nb} entrée(s) archivée(s)).", 'success')
+  return Response(contenu, mimetype=mimetype,
+                   headers={'Content-Disposition': f'attachment; filename="{nom_fichier}"'})
+
+@app.route('/pages/journal/exporter-et-vider.pdf', methods=['POST'])
+@admin_required
+def exporter_et_vider_journal_pdf():
+  return _exporter_et_vider_journal('pdf')
+
+@app.route('/pages/journal/exporter-et-vider.xlsx', methods=['POST'])
+@admin_required
+def exporter_et_vider_journal_excel():
+  return _exporter_et_vider_journal('xlsx')
 
 # Pages
 

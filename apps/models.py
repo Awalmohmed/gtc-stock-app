@@ -231,6 +231,7 @@ ACTIONS_JOURNAL = {
     "desarchive_article": ("Désarchivage article", "secondary"),
     "suppression_article": ("Suppression définitive article", "danger"),
     "traiter_alerte": ("Alerte traitée", "success"),
+    "purge_journal": ("Purge du journal", "danger"),
 }
 
 
