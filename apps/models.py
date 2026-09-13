@@ -129,7 +129,13 @@ class Article(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     nom = db.Column(db.String(150), nullable=False)
-    reference = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    # Unique seulement PAR MAGASIN (voir __table_args__ ci-dessous) : un
+    # même article (même référence, même désignation) peut exister dans
+    # plusieurs magasins, chacun avec sa propre quantité — notamment suite
+    # à un transfert inter-magasin (voir gtc_data.transferer_stock). index
+    # (non unique) conservé pour les recherches par référence seule
+    # (import de fichier, rapprochement Sage 100).
+    reference = db.Column(db.String(50), nullable=False, index=True)
     quantite = db.Column(db.Integer, nullable=False, default=0)
     seuil = db.Column(db.Integer, nullable=False, default=0)
     # "Alerte" / "OK" / "Dormant" — mis à jour automatiquement (Alerte/OK)
@@ -156,6 +162,15 @@ class Article(db.Model):
     # (NULL) n'est visible que par un Administrateur, tant que personne
     # ne le lui a assigné (voir apps/gtc_data.py, magasin_effectif()).
     magasin_id = db.Column(db.Integer, db.ForeignKey("magasins.id"), nullable=True)
+
+    # Un article NULL (sans magasin, cas hérité ci-dessus) n'est pas
+    # concerné par cette contrainte : deux magasin_id NULL ne sont jamais
+    # considérés comme égaux (sémantique standard SQL), donc pas de
+    # conflit d'unicité entre eux — un admin les rattachera un jour à un
+    # magasin, à ce moment-là seulement l'unicité s'appliquera vraiment.
+    __table_args__ = (
+        db.UniqueConstraint('reference', 'magasin_id', name='uq_articles_reference_magasin'),
+    )
 
     entrees = db.relationship("Entree", backref="article", lazy="dynamic")
     sorties = db.relationship("Sortie", backref="article", lazy="dynamic")

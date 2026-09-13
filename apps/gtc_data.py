@@ -501,10 +501,12 @@ def add_fournisseur(nom, contact):
 
 def add_article(nom, reference, seuil, quantite, fournisseur_id=None, magasin_id=None):
     """Crée un article au catalogue. Lève ValueError si un champ
-    obligatoire manque ou est invalide, si la référence existe déjà (la
-    contrainte d'unicité en base fait foi, pas seulement la vérification
-    préalable — même précaution que pour add_user / add_fournisseur), ou
-    si le fournisseur / le magasin indiqué est introuvable.
+    obligatoire manque ou est invalide, si la référence existe déjà DANS CE
+    MAGASIN (la contrainte d'unicité en base fait foi, pas seulement la
+    vérification préalable — même précaution que pour add_user /
+    add_fournisseur ; la même référence reste, elle, tout à fait valide
+    dans un autre magasin — voir Article.__table_args__), ou si le
+    fournisseur / le magasin indiqué est introuvable.
 
     Le statut initial est déduit de la quantité vs le seuil (même règle
     que _recalculer_statut) ; l'article démarre sans dernier mouvement."""
@@ -531,8 +533,8 @@ def add_article(nom, reference, seuil, quantite, fournisseur_id=None, magasin_id
         if fournisseur is None:
             raise ValueError("Fournisseur introuvable.")
 
-    if Article.query.filter_by(reference=reference).first():
-        raise ValueError(f"La référence « {reference} » existe déjà.")
+    if Article.query.filter_by(reference=reference, magasin_id=magasin_id).first():
+        raise ValueError(f"La référence « {reference} » existe déjà dans ce magasin.")
 
     article = Article(
         nom=nom, reference=reference, seuil=seuil, quantite=quantite,
@@ -546,7 +548,7 @@ def add_article(nom, reference, seuil, quantite, fournisseur_id=None, magasin_id
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
-        raise ValueError(f"La référence « {reference} » existe déjà.")
+        raise ValueError(f"La référence « {reference} » existe déjà dans ce magasin.")
     return article
 
 
@@ -566,8 +568,12 @@ def maj_article(article_id, nom, seuil, fournisseur_id=None,
     L'article est résolu via get_article() : un Gestionnaire de stock ne
     peut pas modifier un article hors de son magasin (ValueError « Article
     introuvable »). Lève aussi ValueError si la désignation est vide/trop
-    longue, si le seuil est négatif, ou si le fournisseur / le magasin
-    indiqué est introuvable."""
+    longue, si le seuil est négatif, si le fournisseur / le magasin
+    indiqué est introuvable, ou si sa référence existe déjà dans le
+    magasin de destination choisi (la référence n'étant unique QUE par
+    magasin — voir Article.__table_args__ — déplacer un article peut
+    désormais entrer en conflit avec un article homonyme déjà présent
+    là-bas)."""
     article = get_article(article_id)
     if article is None:
         raise ValueError("Article introuvable.")
@@ -586,6 +592,12 @@ def maj_article(article_id, nom, seuil, fournisseur_id=None,
     if peut_changer_magasin:
         if not magasin_id or db.session.get(Magasin, magasin_id) is None:
             raise ValueError("Merci d'indiquer le magasin de rattachement de l'article.")
+        if magasin_id != article.magasin_id and Article.query.filter_by(
+            reference=article.reference, magasin_id=magasin_id
+        ).first():
+            raise ValueError(
+                f"La référence « {article.reference} » existe déjà dans le magasin de destination."
+            )
         article.magasin_id = magasin_id
 
     article.nom = nom
@@ -593,7 +605,13 @@ def maj_article(article_id, nom, seuil, fournisseur_id=None,
     article.fournisseur_id = fournisseur_id
     if article.statut != "Dormant":
         article.statut = "Alerte" if article.quantite <= seuil else "OK"
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError(
+            f"La référence « {article.reference} » existe déjà dans le magasin de destination."
+        )
     return article
 
 
