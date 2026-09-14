@@ -102,9 +102,12 @@ def fiche_stock_pdf(article, historique):
         ["Statut", article.statut],
         ["Dernier mouvement", article.dernier_mouvement or "—"],
     ]
+    # h["detail"] retombe sur le motif quand une Entree n'a pas de
+    # référence externe (ex. régularisation, sans bordereau) — voir
+    # gtc_data._mouvement_vers_dict.
     lignes_historique = [["Date", "Type", "Référence", "Quantité", "Solde après mouvement"]]
     lignes_historique += [
-        [h["date"], h["type"], h["reference"], h["quantite"], str(h["solde"])]
+        [h["date"], h["type"], h["detail"], h["quantite"], str(h["solde"])]
         for h in historique
     ] or [["Aucun mouvement enregistré.", "", "", "", ""]]
 
@@ -137,7 +140,7 @@ def fiche_stock_excel(article, historique):
     for cellule in historique_feuille[1]:
         cellule.font = Font(bold=True)
     for h in historique:
-        historique_feuille.append([h["date"], h["type"], h["reference"], h["quantite_brute"], h["solde"]])
+        historique_feuille.append([h["date"], h["type"], h["detail"], h["quantite_brute"], h["solde"]])
     for i in range(1, 6):
         historique_feuille.column_dimensions[get_column_letter(i)].width = 18
 

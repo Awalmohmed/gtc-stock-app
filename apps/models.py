@@ -193,8 +193,31 @@ class Article(db.Model):
         return self.quantite - self.sage_quantite
 
 
+# Libellé + classe Bootstrap affichés pour chaque type d'entrée de stock
+# (voir Entree.type_entree ci-dessous et apps/gtc_data.py, add_entree) —
+# même principe que ACTIONS_JOURNAL.
+TYPES_ENTREE = {
+    "reception_fournisseur": ("Réception fournisseur", "success"),
+    "retour_client": ("Retour client", "info"),
+    "regularisation": ("Régularisation", "warning"),
+}
+
+# La régularisation modifie le stock sans document externe réel (pas de
+# bordereau, pas de client) : réservée aux rôles opérationnels, pas à un
+# Comptable (qui peut, lui, toujours saisir une réception ou un retour
+# client — voir apps/gtc_data.py, add_entree).
+ROLES_REGULARISATION = ("Administrateur", "Gestionnaire de stock")
+
+
 class Entree(db.Model):
-    """Entrée de stock (réception fournisseur)."""
+    """Entrée de stock : réception fournisseur, retour client, ou
+    régularisation de stock (voir TYPES_ENTREE). Champs utilisés selon
+    le type (voir apps/gtc_data.py, add_entree, pour la validation) :
+      - Réception fournisseur : fournisseur_id + reference (n° de bordereau) ;
+      - Retour client : reference (nom/référence du client) + motif
+        (texte libre, optionnel) ;
+      - Régularisation : motif (obligatoire — une courte catégorie,
+        éventuellement suivie d'un détail libre pour « Autre »)."""
 
     __tablename__ = "entrees"
 
@@ -202,8 +225,14 @@ class Entree(db.Model):
     article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
     date = db.Column(db.Date, nullable=False)
     quantite = db.Column(db.Integer, nullable=False)
+    # server_default : les entrées déjà en base avant cette fonctionnalité
+    # étaient toutes des réceptions fournisseur (la seule sorte qui
+    # existait alors) — la migration les classe donc ainsi plutôt que de
+    # laisser une valeur vide.
+    type_entree = db.Column(db.String(30), nullable=False, server_default="reception_fournisseur")
     fournisseur_id = db.Column(db.Integer, db.ForeignKey("fournisseurs.id"), nullable=True)
     reference = db.Column(db.String(50), nullable=True)
+    motif = db.Column(db.String(255), nullable=True)
     utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
 
     utilisateur = db.relationship("Utilisateur")
@@ -211,6 +240,14 @@ class Entree(db.Model):
 
     def __repr__(self):
         return f"<Entree article={self.article_id} +{self.quantite}>"
+
+    @property
+    def type_entree_libelle(self):
+        return TYPES_ENTREE.get(self.type_entree, (self.type_entree, "secondary"))[0]
+
+    @property
+    def type_entree_classe(self):
+        return TYPES_ENTREE.get(self.type_entree, (self.type_entree, "secondary"))[1]
 
 
 class Sortie(db.Model):

@@ -105,11 +105,35 @@ def creer_entree():
     article_id = request.form.get('article_id', type=int)
     quantite = request.form.get('quantite', type=int)
     date_mouvement = _parser_date_formulaire(request.form.get('date') or '')
-    fournisseur_id = request.form.get('fournisseur_id', type=int)
-    reference = (request.form.get('reference') or '').strip()
     if quantite is None:
       raise ValueError("Merci d'indiquer une quantité valide.")
-    add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, utilisateur)
+
+    # Le formulaire n'affiche que les champs pertinents pour le type
+    # d'entrée choisi (voir templates/pages/entrees.html), mais chaque
+    # type utilise un nom de champ différent pour sa « référence » et son
+    # « motif » — on les résout ici avant d'appeler add_entree, qui reste
+    # la seule source de vérité sur ce qui est obligatoire pour chacun.
+    type_entree = request.form.get('type_entree') or ''
+    fournisseur_id = request.form.get('fournisseur_id', type=int)
+    if type_entree == 'reception_fournisseur':
+      reference = request.form.get('reference_reception')
+      motif = None
+    elif type_entree == 'retour_client':
+      reference = request.form.get('reference_client')
+      motif = request.form.get('motif_retour')
+      fournisseur_id = None
+    elif type_entree == 'regularisation':
+      reference = None
+      motif_categorie = (request.form.get('motif_regularisation') or '').strip()
+      detail = (request.form.get('motif_regularisation_autre') or '').strip()
+      motif = f"Autre : {detail}" if motif_categorie == 'Autre' and detail else motif_categorie
+      fournisseur_id = None
+    else:
+      reference = None
+      motif = None
+
+    add_entree(article_id, date_mouvement, quantite, type_entree, fournisseur_id, reference,
+               motif, utilisateur)
   except ValueError as e:
     flash(str(e), 'danger')
     return redirect(url_for('pages_entrees'))

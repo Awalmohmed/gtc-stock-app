@@ -5,8 +5,19 @@
   2) tableau des entrées enregistrées (récent -> ancien).
   Article choisi via un champ de recherche (autocomplétion — voir
   includes/article-picker.html) plutôt qu'une liste déroulante.
-  Toute validation réelle (article mouvementable...) est côté serveur
-  (gtc_data.add_entree) ; ici data-validate = confort.
+
+  Type d'entrée (voir apps/models.py, TYPES_ENTREE) : le sélecteur en
+  tête de formulaire affiche/masque en JS (extra_js ci-dessous) le bloc
+  de champs pertinent — chaque bloc utilise son propre nom de champ
+  (reference_reception / reference_client / motif_regularisation(_autre))
+  plutôt que de réutiliser "reference"/"motif" pour plusieurs blocs à la
+  fois : plus robuste qu'un show/hide seul (un champ masqué mais pas
+  désactivé serait quand même soumis). « Régularisation » n'est proposée
+  qu'à un Administrateur ou un Gestionnaire de stock (voir
+  ROLES_REGULARISATION) — la vérification qui compte reste côté serveur
+  (gtc_data.add_entree).
+  Toute validation réelle est côté serveur (gtc_data.add_entree) ; ici
+  data-validate = confort.
 #}
 {% extends 'layouts/gtc-base.html' %}
 
@@ -22,11 +33,24 @@
       <h6 class="mb-3"><i class="bi bi-box-arrow-in-down text-success"></i> Nouvelle entrée</h6>
       <form action="{{ url_for('creer_entree') }}" method="post" data-validate novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Type d'entrée</label>
+          <select class="form-select" name="type_entree" id="entree-type" required>
+            <option value="reception_fournisseur" selected>Réception fournisseur</option>
+            <option value="retour_client">Retour client</option>
+            {% if current_user and current_user.role in ['Administrateur', 'Gestionnaire de stock'] %}
+            <option value="regularisation">Régularisation</option>
+            {% endif %}
+          </select>
+        </div>
+
         <div class="mb-2">
           <label class="form-label small fw-semibold">Article</label>
           {% set article_picker_id = 'entree-article' %}
           {% include 'includes/article-picker.html' %}
         </div>
+
         <div class="row">
           <div class="col-6 mb-2">
             <label class="form-label small fw-semibold">Quantité</label>
@@ -37,24 +61,62 @@
             <input type="date" name="date" class="form-control" required>
           </div>
         </div>
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Fournisseur</label>
-          <select class="form-select" name="fournisseur_id" required>
-            <option value="" selected disabled>Sélectionner un fournisseur</option>
-            {% for f in fournisseurs %}
-            <option value="{{ f.id }}">{{ f.nom }}</option>
-            {% else %}
-            <option value="" disabled>Aucun fournisseur — ajoutez-en un d'abord</option>
-            {% endfor %}
-          </select>
-          <div class="form-text">
-            <a href="{{ url_for('pages_fournisseurs') }}">Gérer les fournisseurs</a>
+
+        <!-- Réception fournisseur -->
+        <div data-type-entree-groupe="reception_fournisseur">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Fournisseur</label>
+            <select class="form-select" name="fournisseur_id" data-type-entree-champ required>
+              <option value="" selected disabled>Sélectionner un fournisseur</option>
+              {% for f in fournisseurs %}
+              <option value="{{ f.id }}">{{ f.nom }}</option>
+              {% else %}
+              <option value="" disabled>Aucun fournisseur — ajoutez-en un d'abord</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              <a href="{{ url_for('pages_fournisseurs') }}">Gérer les fournisseurs</a>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">N° bordereau de réception</label>
+            <input type="text" name="reference_reception" class="form-control"
+                   placeholder="ex : BR-2026-0143" data-type-entree-champ required>
           </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">N° bordereau de réception</label>
-          <input type="text" name="reference" class="form-control" placeholder="ex : BR-2026-0143" required>
+
+        <!-- Retour client -->
+        <div data-type-entree-groupe="retour_client" hidden>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Nom ou référence du client</label>
+            <input type="text" name="reference_client" class="form-control"
+                   placeholder="ex : Sté Dupont / CLI-0042" data-type-entree-champ>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Motif du retour (optionnel)</label>
+            <input type="text" name="motif_retour" class="form-control" placeholder="ex : article défectueux">
+          </div>
         </div>
+
+        <!-- Régularisation -->
+        <div data-type-entree-groupe="regularisation" hidden>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Motif</label>
+            <select class="form-select" name="motif_regularisation" id="entree-motif-regul" data-type-entree-champ>
+              <option value="" selected disabled>Sélectionner un motif</option>
+              <option value="Inventaire">Inventaire</option>
+              <option value="Casse/perte">Casse / perte</option>
+              <option value="Erreur de saisie">Erreur de saisie</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+          <div class="mb-3" id="entree-motif-regul-autre-groupe" hidden>
+            <label class="form-label small fw-semibold">Précisez</label>
+            <input type="text" name="motif_regularisation_autre" class="form-control"
+                   placeholder="ex : erreur d'étiquetage">
+          </div>
+        </div>
+
         <button type="submit" class="btn btn-success w-100 fw-semibold">Enregistrer l'entrée</button>
       </form>
     </div>
@@ -69,8 +131,9 @@
       <thead class="text-muted small">
         <tr>
           <th>Date</th>
+          <th>Type</th>
           <th>Article</th>
-          <th>Référence document</th>
+          <th>Référence / Motif</th>
           <th>Quantité</th>
           <th>Saisi par</th>
         </tr>
@@ -79,13 +142,20 @@
         {% for m in mouvements %}
         <tr>
           <td>{{ m.date }}</td>
+          <td>
+            {% if m.type_entree %}
+            <span class="badge bg-{{ m.type_entree_classe }}-subtle text-{{ m.type_entree_classe }}">{{ m.type_entree }}</span>
+            {% else %}
+            —
+            {% endif %}
+          </td>
           <td>{{ m.article }}</td>
-          <td>{{ m.reference }}</td>
+          <td>{{ m.detail }}</td>
           <td>{{ m.quantite }}</td>
           <td>{{ m.saisi_par }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="text-muted text-center">Aucune entrée enregistrée.</td></tr>
+        <tr><td colspan="6" class="text-muted text-center">Aucune entrée enregistrée.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -93,3 +163,48 @@
 </div>
 
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+  // Affiche/masque les champs pertinents selon le type d'entrée choisi
+  // (voir apps/models.py, TYPES_ENTREE). Désactiver (pas seulement
+  // masquer) les champs du bloc inactif évite qu'ils soient quand même
+  // soumis, et retirer leur `required` évite qu'ils bloquent la
+  // validation native du navigateur alors qu'ils sont invisibles.
+  (function () {
+    var selectType = document.getElementById('entree-type');
+    var groupes = document.querySelectorAll('[data-type-entree-groupe]');
+    if (!selectType || !groupes.length) return;
+
+    function majGroupes() {
+      var type = selectType.value;
+      groupes.forEach(function (groupe) {
+        var actif = groupe.getAttribute('data-type-entree-groupe') === type;
+        groupe.hidden = !actif;
+        groupe.querySelectorAll('[data-type-entree-champ]').forEach(function (champ) {
+          champ.disabled = !actif;
+          if (actif) champ.setAttribute('required', 'required');
+          else champ.removeAttribute('required');
+        });
+      });
+    }
+    selectType.addEventListener('change', majGroupes);
+    majGroupes();
+
+    // Régularisation : le champ libre "Précisez" n'apparaît que pour le
+    // motif "Autre".
+    var selectMotifRegul = document.getElementById('entree-motif-regul');
+    var groupeAutre = document.getElementById('entree-motif-regul-autre-groupe');
+    if (!selectMotifRegul || !groupeAutre) return;
+    var champAutre = groupeAutre.querySelector('input');
+
+    function majAutre() {
+      var affiche = selectMotifRegul.value === 'Autre';
+      groupeAutre.hidden = !affiche;
+      if (champAutre) champAutre.disabled = !affiche;
+    }
+    selectMotifRegul.addEventListener('change', majAutre);
+    majAutre();
+  })();
+</script>
+{% endblock extra_js %}

@@ -19,7 +19,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from apps import db
 from apps.models import (
     Utilisateur, Article, Entree, Sortie, Transfert, Fournisseur, JournalActivite,
-    Magasin, Alerte, ROLE_CLASSES, ROLES_TOUS_MAGASINS,
+    Magasin, Alerte, ROLE_CLASSES, ROLES_TOUS_MAGASINS, TYPES_ENTREE, ROLES_REGULARISATION,
 )
 from apps import sage_connector
 from apps import mailer
@@ -462,8 +462,12 @@ def traiter_alerte(alerte_id, acteur=None):
 
 def _mouvement_vers_dict(mouvement, type_libelle, signe):
     """Formate une ligne Entree/Sortie pour l'affichage (gabarit commun
-    aux pages entrées/sorties et fiche de stock)."""
-    return {
+    aux pages entrées/sorties et fiche de stock).
+
+    `detail` complète `reference` pour une Entree sans référence externe
+    (une régularisation n'a pas de bordereau) : on retombe alors sur son
+    motif, pour ne jamais afficher une ligne vide de tout contexte."""
+    ligne = {
         "date": mouvement.date.strftime("%d/%m/%Y"),
         "date_tri": mouvement.date,
         "id_tri": mouvement.id,
@@ -475,6 +479,16 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
         "quantite_brute": mouvement.quantite,
         "saisi_par": mouvement.utilisateur.nom if mouvement.utilisateur else "—",
     }
+    # type_entree n'existe que sur Entree (voir apps/models.py) — absent
+    # pour une Sortie, d'où le getattr plutôt qu'un accès direct.
+    type_entree = getattr(mouvement, "type_entree", None)
+    if type_entree:
+        ligne["type_entree"] = mouvement.type_entree_libelle
+        ligne["type_entree_classe"] = mouvement.type_entree_classe
+        ligne["detail"] = mouvement.reference or mouvement.motif or "—"
+    else:
+        ligne["detail"] = ligne["reference"]
+    return ligne
 
 
 def get_entrees():
@@ -737,20 +751,56 @@ def _article_mouvementable(article_id):
     return article
 
 
-def add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, utilisateur):
-    """Enregistre une entrée de stock et met à jour l'article. Lève
-    ValueError si l'article ou le fournisseur est introuvable, ou si la
-    quantité est invalide."""
+def add_entree(article_id, date_mouvement, quantite, type_entree, fournisseur_id, reference,
+                motif, utilisateur):
+    """Enregistre une entrée de stock et met à jour l'article. `type_entree`
+    (voir TYPES_ENTREE) détermine quels champs sont exigés :
+      - "reception_fournisseur" : fournisseur_id (un fournisseur valide)
+        ET reference (n° de bordereau) ;
+      - "retour_client" : reference (nom/référence du client) ; motif
+        (motif du retour) reste facultatif ;
+      - "regularisation" : motif obligatoire, réservée aux rôles
+        ROLES_REGULARISATION (Administrateur / Gestionnaire de stock) —
+        pas de fournisseur ni de référence externe (aucun document réel).
+
+    Lève ValueError si l'article est introuvable, si `type_entree` est
+    invalide, si un champ obligatoire pour ce type manque, si le rôle de
+    `utilisateur` n'autorise pas une régularisation, ou si la quantité
+    est invalide."""
     article = _article_mouvementable(article_id)
     if quantite <= 0:
         raise ValueError("La quantité doit être supérieure à zéro.")
-    fournisseur = db.session.get(Fournisseur, fournisseur_id) if fournisseur_id else None
-    if not fournisseur:
-        raise ValueError("Merci de sélectionner un fournisseur.")
+    if type_entree not in TYPES_ENTREE:
+        raise ValueError("Type d'entrée invalide.")
+
+    reference = (reference or "").strip() or None
+    motif = (motif or "").strip() or None
+    fournisseur = None
+
+    if type_entree == "reception_fournisseur":
+        fournisseur = db.session.get(Fournisseur, fournisseur_id) if fournisseur_id else None
+        if not fournisseur:
+            raise ValueError("Merci de sélectionner un fournisseur.")
+        if not reference:
+            raise ValueError("Merci d'indiquer le n° de bordereau de réception.")
+    elif type_entree == "retour_client":
+        if not reference:
+            raise ValueError("Merci d'indiquer le nom ou la référence du client.")
+    elif type_entree == "regularisation":
+        if utilisateur is None or utilisateur.role not in ROLES_REGULARISATION:
+            raise ValueError(
+                "Seuls un Administrateur ou un Gestionnaire de stock peuvent "
+                "enregistrer une régularisation."
+            )
+        if not motif:
+            raise ValueError("Merci d'indiquer le motif de la régularisation.")
+        reference = None  # pas de document externe pour une régularisation
 
     entree = Entree(
         article_id=article.id, date=date_mouvement, quantite=quantite,
-        fournisseur_id=fournisseur.id, reference=reference or None,
+        type_entree=type_entree,
+        fournisseur_id=fournisseur.id if fournisseur else None,
+        reference=reference, motif=motif,
         utilisateur_id=utilisateur.id if utilisateur else None,
     )
     article.quantite += quantite
@@ -758,8 +808,11 @@ def add_entree(article_id, date_mouvement, quantite, fournisseur_id, reference, 
     _recalculer_statut(article)
 
     db.session.add(entree)
-    _journaliser(utilisateur, "entree_stock",
-                 f"Entrée de {quantite} sur « {article.nom} » ({article.reference}).")
+    _journaliser(
+        utilisateur, "entree_stock",
+        f"Entrée de {quantite} sur « {article.nom} » ({article.reference}) "
+        f"— {entree.type_entree_libelle}.",
+    )
     db.session.commit()
     return entree
 
