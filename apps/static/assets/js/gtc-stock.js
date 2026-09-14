@@ -70,4 +70,154 @@ document.addEventListener("DOMContentLoaded", function () {
     pwd2.addEventListener("input", checkMatch);
   }
 
+  // ---- 5. Recherche d'article avec autocomplétion (type-ahead) ----
+  // Remplace les listes déroulantes <select> d'article (impraticables dès
+  // que le catalogue grandit) par un champ de recherche : quelques
+  // lettres de la référence ou de la désignation suffisent, au plus 10
+  // suggestions apparaissent (voir apps/templates/includes/article-picker.html
+  // pour le balisage attendu, et la route /pages/articles/recherche —
+  // elle-même limitée à 10 résultats et déjà filtrée par magasin côté
+  // serveur — jamais tout le catalogue chargé d'un coup).
+  document.querySelectorAll("[data-article-picker]").forEach(function (racine) {
+    var champTexte = racine.querySelector("[data-article-picker-input]");
+    var champValeur = racine.querySelector("[data-article-picker-value]");
+    var listeSuggestions = racine.querySelector("[data-article-picker-suggestions]");
+    if (!champTexte || !champValeur || !listeSuggestions) return;
+
+    var idSourceMagasin = racine.getAttribute("data-magasin-source-input");
+    var selectMagasinSource = idSourceMagasin ? document.getElementById(idSourceMagasin) : null;
+
+    var minuteur = null;
+    var requeteEnCours = 0;
+    var elementsSuggeres = [];
+    var indexActif = -1;
+
+    function magasinCourant() {
+      return selectMagasinSource ? selectMagasinSource.value : "";
+    }
+
+    function viderSelection() {
+      champValeur.value = "";
+    }
+
+    function fermerSuggestions() {
+      listeSuggestions.style.display = "none";
+      listeSuggestions.innerHTML = "";
+      elementsSuggeres = [];
+      indexActif = -1;
+    }
+
+    function surSurbrillance() {
+      elementsSuggeres.forEach(function (el, i) {
+        el.classList.toggle("active", i === indexActif);
+      });
+    }
+
+    function choisirArticle(article) {
+      champValeur.value = article.id;
+      champTexte.value = article.nom + " — " + article.reference;
+      fermerSuggestions();
+    }
+
+    function afficherSuggestions(articles) {
+      listeSuggestions.innerHTML = "";
+      elementsSuggeres = [];
+      indexActif = -1;
+      if (!articles.length) {
+        var vide = document.createElement("div");
+        vide.className = "list-group-item text-muted small";
+        vide.textContent = "Aucun article trouvé.";
+        listeSuggestions.appendChild(vide);
+      } else {
+        articles.forEach(function (article) {
+          var item = document.createElement("button");
+          item.type = "button";
+          item.className = "list-group-item list-group-item-action";
+          item.textContent = article.nom + " — " + article.reference + " (" + article.quantite + " en stock)";
+          // mousedown (pas click) : se déclenche avant le blur du champ
+          // texte, qui sinon fermerait les suggestions en premier.
+          item.addEventListener("mousedown", function (event) {
+            event.preventDefault();
+            choisirArticle(article);
+          });
+          listeSuggestions.appendChild(item);
+          elementsSuggeres.push(item);
+        });
+      }
+      listeSuggestions.style.display = "block";
+    }
+
+    function rechercher(terme) {
+      var url = "/pages/articles/recherche?q=" + encodeURIComponent(terme);
+      var magasinId = magasinCourant();
+      if (magasinId) url += "&magasin_id=" + encodeURIComponent(magasinId);
+      var requete = ++requeteEnCours;
+      fetch(url)
+        .then(function (reponse) { return reponse.ok ? reponse.json() : []; })
+        .then(function (articles) {
+          // Ignore une réponse devenue obsolète (une saisie plus récente
+          // a déjà déclenché une nouvelle recherche entre-temps).
+          if (requete === requeteEnCours) afficherSuggestions(articles);
+        })
+        .catch(function () { fermerSuggestions(); });
+    }
+
+    champTexte.addEventListener("input", function () {
+      viderSelection();
+      var terme = champTexte.value.trim();
+      clearTimeout(minuteur);
+      if (!terme || (selectMagasinSource && !magasinCourant())) {
+        fermerSuggestions();
+        return;
+      }
+      minuteur = setTimeout(function () { rechercher(terme); }, 200);
+    });
+
+    champTexte.addEventListener("keydown", function (event) {
+      if (!elementsSuggeres.length) return;
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        indexActif = Math.min(indexActif + 1, elementsSuggeres.length - 1);
+        surSurbrillance();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        indexActif = Math.max(indexActif - 1, 0);
+        surSurbrillance();
+      } else if (event.key === "Enter") {
+        // Empêche une soumission accidentelle du formulaire tant que la
+        // sélection n'est pas explicite (au clavier ou à la souris).
+        event.preventDefault();
+        var cible = indexActif >= 0 ? elementsSuggeres[indexActif] : (
+          elementsSuggeres.length === 1 ? elementsSuggeres[0] : null
+        );
+        if (cible) cible.dispatchEvent(new Event("mousedown"));
+      } else if (event.key === "Escape") {
+        fermerSuggestions();
+      }
+    });
+
+    champTexte.addEventListener("blur", function () {
+      // Léger délai : laisse le mousedown d'une suggestion s'exécuter
+      // avant de fermer la liste (sinon le blur la ferme en premier).
+      setTimeout(fermerSuggestions, 150);
+    });
+
+    if (selectMagasinSource) {
+      function majDisponibilite() {
+        var disponible = !!magasinCourant();
+        champTexte.disabled = !disponible;
+        champTexte.placeholder = disponible
+          ? "Rechercher un article (référence ou désignation)…"
+          : "Choisissez d'abord le magasin source";
+        if (!disponible) {
+          champTexte.value = "";
+          viderSelection();
+          fermerSuggestions();
+        }
+      }
+      selectMagasinSource.addEventListener("change", majDisponibilite);
+      majDisponibilite();
+    }
+  });
+
 });

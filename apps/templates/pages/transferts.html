@@ -2,15 +2,17 @@
   Transferts inter-magasins — route pages_transferts (GET /pages/transferts/),
   réservée à un Gestionnaire de stock ou un Administrateur (@roles_required).
   Reçoit : magasins (tous, pour les sélecteurs), transferts (get_transferts,
-  déjà restreint au périmètre courant), magasin_source_impose/_nom (magasin
-  source imposé — le sien — pour un Gestionnaire ; None pour un
-  Administrateur, qui choisit librement), articles_source (articles du
-  magasin imposé, Gestionnaire seulement), articles_par_magasin (Administrateur
-  seulement : {magasin_id: [{id, nom, reference, quantite}, ...]} pour
-  peupler en cascade le sélecteur d'article en JS quand le magasin source
-  change, sans recharger la page).
+  déjà restreint au périmètre courant), est_admin, magasin_source_impose/_nom
+  (magasin source imposé — le sien — pour un Gestionnaire ; None pour un
+  Administrateur, qui choisit librement).
   Sections : 1) formulaire « Nouveau transfert » -> POST creer_transfert ;
   2) tableau de l'historique des transferts (récent -> ancien).
+  Article choisi via un champ de recherche (autocomplétion — voir
+  includes/article-picker.html et /pages/articles/recherche) plutôt qu'une
+  liste déroulante ; pour un Administrateur, la recherche est restreinte au
+  magasin source choisi (data-magasin-source-input, lu dynamiquement par le
+  JS de gtc-stock.js) — pour un Gestionnaire de stock, son propre magasin
+  s'applique automatiquement côté serveur.
   Toute validation réelle (stock disponible, magasins distincts, article
   bien dans le magasin source...) est côté serveur (gtc_data.transferer_stock) ;
   ici data-validate = confort.
@@ -63,15 +65,9 @@
 
         <div class="mb-2">
           <label class="form-label small fw-semibold">Article</label>
-          <select class="form-select" id="trf-article" name="article_id" required
-                  {% if not magasin_source_impose %}disabled{% endif %}>
-            <option value="" selected disabled>
-              {% if magasin_source_impose %}Sélectionner un article{% else %}Choisissez d'abord le magasin source{% endif %}
-            </option>
-            {% for a in articles_source %}
-            <option value="{{ a.id }}">{{ a.nom }} — {{ a.reference }} ({{ a.quantite }} en stock)</option>
-            {% endfor %}
-          </select>
+          {% set article_picker_id = 'trf-article' %}
+          {% set article_picker_magasin_source_input = 'trf-magasin-source' if est_admin else none %}
+          {% include 'includes/article-picker.html' %}
         </div>
 
         <div class="row">
@@ -132,37 +128,13 @@
 {% block extra_js %}
 {% if est_admin and magasins|length >= 2 %}
 <script>
-  // Sélecteur en cascade (Administrateur seulement) : la liste des articles
-  // dépend du magasin source choisi — peuplée depuis articles_par_magasin
-  // (rendu côté serveur, pas d'appel réseau) sans recharger la page.
-  var ARTICLES_PAR_MAGASIN = {{ articles_par_magasin|tojson }};
+  // Confort (Administrateur seulement) : empêche de choisir le même
+  // magasin en source et en destination — la validation qui compte reste
+  // côté serveur (gtc_data.transferer_stock). Le peuplement de l'article
+  // en fonction du magasin source est géré par le composant générique
+  // « article-picker » (voir static/assets/js/gtc-stock.js, section 5),
+  // via son attribut data-magasin-source-input.
   var selectMagasinSource = document.getElementById('trf-magasin-source');
-  var selectArticle = document.getElementById('trf-article');
-
-  if (selectMagasinSource && selectArticle) {
-    selectMagasinSource.addEventListener('change', function () {
-      var articles = ARTICLES_PAR_MAGASIN[selectMagasinSource.value] || [];
-      selectArticle.innerHTML = '';
-      var optionVide = document.createElement('option');
-      optionVide.value = '';
-      optionVide.selected = true;
-      optionVide.disabled = true;
-      optionVide.textContent = articles.length
-        ? 'Sélectionner un article'
-        : 'Aucun article actif dans ce magasin';
-      selectArticle.appendChild(optionVide);
-      articles.forEach(function (a) {
-        var option = document.createElement('option');
-        option.value = a.id;
-        option.textContent = a.nom + ' — ' + a.reference + ' (' + a.quantite + ' en stock)';
-        selectArticle.appendChild(option);
-      });
-      selectArticle.disabled = articles.length === 0;
-    });
-  }
-
-  // Confort : empêche de choisir le même magasin en source et en
-  // destination (la validation qui compte reste côté serveur).
   var selectMagasinDestination = document.getElementById('trf-magasin-destination');
   function masquerMagasinSourceDansDestination() {
     if (!selectMagasinSource || !selectMagasinDestination) return;

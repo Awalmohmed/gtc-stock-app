@@ -322,20 +322,45 @@ def get_articles_archives():
     ).order_by(Article.nom).all()
 
 
-def get_articles_par_magasin():
-    """Articles actifs (non archivés) de TOUS les magasins, regroupés par
-    magasin_id — pour le sélecteur en cascade (magasin source -> article)
-    du formulaire de transfert (voir pages/transferts.html). Volontairement
-    HORS du périmètre magasin courant (_scope_magasin) : un Administrateur
-    doit pouvoir choisir n'importe quel magasin comme source, quel que soit
-    le magasin sélectionné dans le filtre de la barre supérieure."""
-    resultat = {}
-    for a in Article.query.filter(Article.archive.is_(False)).order_by(Article.nom).all():
-        if a.magasin_id:
-            resultat.setdefault(a.magasin_id, []).append(
-                {"id": a.id, "nom": a.nom, "reference": a.reference, "quantite": a.quantite}
-            )
-    return resultat
+def rechercher_articles(terme, magasin_id=None):
+    """Articles actifs (non archivés) dont la référence OU la désignation
+    contient `terme` (insensible à la casse), limité à 10 résultats — pour
+    l'autocomplétion (type-ahead) des formulaires de mouvement (entrée,
+    sortie, transfert) : jamais le catalogue entier chargé d'un coup, voir
+    la route pages_articles_recherche.
+
+    Périmètre :
+      - si `magasin_id` est fourni ET que l'utilisateur courant a le droit
+        de le consulter (rôle qui voit tous les magasins, ou c'est bien
+        SON magasin de rattachement), restreint à ce seul magasin — c'est
+        le cas du formulaire de transfert, où le magasin source choisi
+        peut différer du filtre de la barre supérieure (session
+        magasin_filtre) ; sinon (magasin_id absent, ou refusé) retombe
+        sur le périmètre magasin courant habituel (_filtrer_articles),
+        le même que get_all_articles() pour les formulaires Entrée/Sortie."""
+    terme = (terme or "").strip()
+    if not terme:
+        return []
+
+    query = Article.query.filter(Article.archive.is_(False))
+    if magasin_id is not None:
+        utilisateur = _utilisateur_courant()
+        autorise = utilisateur is not None and (
+            utilisateur.role in ROLES_TOUS_MAGASINS or utilisateur.magasin_id == magasin_id
+        )
+        if not autorise:
+            return []
+        query = query.filter(Article.magasin_id == magasin_id)
+    else:
+        query = _filtrer_articles(query)
+
+    motif = f"%{terme}%"
+    query = query.filter(sa_or(Article.reference.ilike(motif), Article.nom.ilike(motif)))
+    articles = query.order_by(Article.nom).limit(10).all()
+    return [
+        {"id": a.id, "nom": a.nom, "reference": a.reference, "quantite": a.quantite}
+        for a in articles
+    ]
 
 
 def get_article(article_id, inclure_archives=False):
@@ -828,7 +853,11 @@ def transferer_stock(magasin_source_id, magasin_destination_id, article_id, quan
     if magasin_source_id == magasin_destination_id:
         raise ValueError("Le magasin source et le magasin destination doivent être différents.")
 
-    article_source = db.session.get(Article, article_id)
+    # article_id peut arriver vide (ex. champ de recherche d'article laissé
+    # sans sélection explicite — voir includes/article-picker.html) : le
+    # traiter explicitement plutôt que de laisser Session.get() gérer une
+    # clé primaire NULL (accepté aujourd'hui mais déprécié par SQLAlchemy).
+    article_source = db.session.get(Article, article_id) if article_id else None
     if article_source is None or article_source.magasin_id != magasin_source_id:
         raise ValueError("Article introuvable dans le magasin source.")
     if article_source.archive:

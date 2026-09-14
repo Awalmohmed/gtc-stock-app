@@ -6,7 +6,7 @@ Copyright (c) 2019 - present AppSeed.us
 # Flask modules
 from datetime import datetime
 
-from flask   import render_template, request, redirect, url_for, session, flash, Response
+from flask   import render_template, request, redirect, url_for, session, flash, Response, jsonify
 from jinja2  import TemplateNotFound
 
 # App modules
@@ -17,7 +17,7 @@ from apps.gtc_data import (
   get_all_fournisseurs, add_fournisseur, get_journal, vider_journal, get_alertes, traiter_alerte,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
   maj_magasin, add_article, maj_article, archiver_article, desarchiver_article,
-  supprimer_definitivement_article, get_articles_archives, get_articles_par_magasin,
+  supprimer_definitivement_article, get_articles_archives, rechercher_articles,
   transferer_stock, get_transferts,
   verify_credentials, add_user, maj_utilisateur, basculer_statut_utilisateur,
   reinitialiser_mot_de_passe, get_user_by_identifiant,
@@ -77,15 +77,17 @@ def pages_dashboard():
 @app.route('/pages/entrees/')
 @login_required
 def pages_entrees():
+  # L'article est choisi via un champ de recherche (autocomplétion, voir
+  # /pages/articles/recherche) plutôt qu'une liste déroulante -> plus
+  # besoin de charger tous les articles du magasin ici.
   return render_template('pages/entrees.html', segment='entrees', parent='pages',
-                          articles=get_all_articles(), mouvements=get_entrees(),
-                          fournisseurs=get_all_fournisseurs())
+                          mouvements=get_entrees(), fournisseurs=get_all_fournisseurs())
 
 @app.route('/pages/sorties/')
 @login_required
 def pages_sorties():
   return render_template('pages/sorties.html', segment='sorties', parent='pages',
-                          articles=get_all_articles(), mouvements=get_sorties())
+                          mouvements=get_sorties())
 
 def _parser_date_formulaire(valeur):
   """Convertit la date d'un <input type="date"> (format AAAA-MM-JJ) en
@@ -133,30 +135,41 @@ def creer_sortie():
   flash("Sortie de stock enregistrée avec succès.", 'success')
   return redirect(url_for('pages_sorties'))
 
+@app.route('/pages/articles/recherche')
+@login_required
+def pages_articles_recherche():
+  """Autocomplétion (type-ahead) du champ Article des formulaires Entrée /
+  Sortie / Transfert : au plus 10 résultats JSON correspondant à `q`
+  (référence ou désignation), jamais le catalogue entier (voir
+  gtc_data.rechercher_articles). `magasin_id` est optionnel — seul le
+  formulaire de transfert l'envoie (le magasin source qu'un Administrateur
+  vient de choisir peut différer du filtre de la barre supérieure) ;
+  rechercher_articles vérifie elle-même que l'utilisateur a bien le droit
+  de consulter ce magasin, et retombe sinon sur le périmètre habituel."""
+  terme = request.args.get('q') or ''
+  magasin_id = request.args.get('magasin_id', type=int)
+  return jsonify(rechercher_articles(terme, magasin_id))
+
 @app.route('/pages/transferts/')
 @roles_required('Gestionnaire de stock', 'Administrateur')
 def pages_transferts():
   utilisateur = get_user_by_identifiant(session.get('identifiant'))
   est_admin = session.get('role') == 'Administrateur'
-  # Magasin source : libre pour un Administrateur (sélecteur + articles de
-  # TOUS les magasins pour le peuplement en cascade côté JS) ; imposé et
-  # non modifiable pour un Gestionnaire de stock (son propre magasin —
-  # aucun sélecteur affiché, voir le template).
+  # Magasin source : libre pour un Administrateur (sélecteur — les
+  # suggestions d'article de ce magasin sont recherchées à la volée via
+  # /pages/articles/recherche, jamais chargées d'un coup) ; imposé et non
+  # modifiable pour un Gestionnaire de stock (son propre magasin — aucun
+  # sélecteur affiché, voir le template).
   if est_admin:
     magasin_source_impose = None
     magasin_source_nom = None
-    articles_source = []
-    articles_par_magasin = get_articles_par_magasin()
   else:
     magasin_source_impose = utilisateur.magasin_id if utilisateur else None
     magasin_source_nom = utilisateur.magasin.nom if utilisateur and utilisateur.magasin else None
-    articles_source = get_all_articles() if magasin_source_impose else []
-    articles_par_magasin = {}
   return render_template(
     'pages/transferts.html', segment='transferts', parent='pages',
     magasins=get_all_magasins(), transferts=get_transferts(), est_admin=est_admin,
     magasin_source_impose=magasin_source_impose, magasin_source_nom=magasin_source_nom,
-    articles_source=articles_source, articles_par_magasin=articles_par_magasin,
   )
 
 @app.route('/pages/transferts/nouveau', methods=['POST'])

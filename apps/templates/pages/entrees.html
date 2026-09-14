@@ -1,8 +1,10 @@
 {#
   Entrées de stock — route pages_entrees (GET /pages/entrees/), tout rôle
-  connecté. Reçoit : articles, mouvements (get_entrees), fournisseurs.
+  connecté. Reçoit : mouvements (get_entrees), fournisseurs.
   Sections : 1) formulaire « Nouvelle entrée » -> POST creer_entree ;
   2) tableau des entrées enregistrées (récent -> ancien).
+  Article choisi via un champ de recherche (autocomplétion — voir
+  includes/article-picker.html) plutôt qu'une liste déroulante.
   Toute validation réelle (article mouvementable...) est côté serveur
   (gtc_data.add_entree) ; ici data-validate = confort.
 #}
@@ -22,12 +24,8 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-2">
           <label class="form-label small fw-semibold">Article</label>
-          <select class="form-select" name="article_id" required>
-            <option value="" selected disabled>Sélectionner un article</option>
-            {% for a in articles %}
-            <option value="{{ a.id }}">{{ a.nom }} — {{ a.reference }}</option>
-            {% endfor %}
-          </select>
+          {% set article_picker_id = 'entree-article' %}
+          {% include 'includes/article-picker.html' %}
         </div>
         <div class="row">
           <div class="col-6 mb-2">

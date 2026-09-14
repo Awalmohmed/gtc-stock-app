@@ -1,8 +1,10 @@
 {#
   Sorties de stock — route pages_sorties (GET /pages/sorties/), tout rôle
-  connecté. Reçoit : articles, mouvements (get_sorties).
+  connecté. Reçoit : mouvements (get_sorties).
   Sections : 1) formulaire « Nouvelle sortie » -> POST creer_sortie ;
   2) tableau des sorties enregistrées (récent -> ancien).
+  Article choisi via un champ de recherche (autocomplétion — voir
+  includes/article-picker.html) plutôt qu'une liste déroulante.
   Toute validation réelle (stock suffisant, article mouvementable...) est
   côté serveur (gtc_data.add_sortie) ; ici data-validate = confort.
 #}
@@ -22,12 +24,8 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-2">
           <label class="form-label small fw-semibold">Article</label>
-          <select class="form-select" name="article_id" required>
-            <option value="" selected disabled>Sélectionner un article</option>
-            {% for a in articles %}
-            <option value="{{ a.id }}">{{ a.nom }} — {{ a.reference }} (stock : {{ a.quantite }})</option>
-            {% endfor %}
-          </select>
+          {% set article_picker_id = 'sortie-article' %}
+          {% include 'includes/article-picker.html' %}
         </div>
         <div class="row">
           <div class="col-6 mb-2">

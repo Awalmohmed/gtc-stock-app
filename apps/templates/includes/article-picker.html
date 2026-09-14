@@ -1,0 +1,34 @@
+{#
+  Composant "recherche d'article" (autocomplétion / type-ahead), utilisé
+  par les formulaires Entrée, Sortie et Transfert à la place d'une liste
+  déroulante <select> (qui devient impraticable dès que le catalogue
+  grandit). Anime le champ le JS générique de static/assets/js/gtc-stock.js
+  (section 5) ; les suggestions viennent de la route JSON
+  /pages/articles/recherche (gtc_data.rechercher_articles), limitée à 10
+  résultats — jamais le catalogue entier chargé d'un coup.
+
+  Variables Jinja attendues avant l'include (via {% set %}) :
+    - article_picker_id : identifiant HTML unique du composant sur la
+      page (plusieurs formulaires peuvent coexister sur une même page).
+    - article_picker_magasin_source_input (optionnel) : id du <select>
+      de magasin source à lire dynamiquement pour scoper la recherche
+      (formulaire de transfert, Administrateur seulement — un
+      Gestionnaire de stock n'a pas ce champ, son magasin de rattachement
+      s'applique automatiquement côté serveur). Omettre sinon.
+
+  Résultat transmis au formulaire : un champ caché name="article_id",
+  comme le faisait le <select> qu'il remplace — aucun changement côté
+  serveur (gtc_data.add_entree / add_sortie / transferer_stock).
+#}
+<div class="position-relative" data-article-picker
+     {% if article_picker_magasin_source_input is defined and article_picker_magasin_source_input %}
+     data-magasin-source-input="{{ article_picker_magasin_source_input }}"
+     {% endif %}>
+  <input type="text" class="form-control" id="{{ article_picker_id }}-texte"
+         data-article-picker-input autocomplete="off" required
+         placeholder="Rechercher un article (référence ou désignation)…">
+  <input type="hidden" name="article_id" data-article-picker-value>
+  <div class="list-group position-absolute w-100 shadow-sm"
+       style="z-index:1055; display:none; max-height:260px; overflow-y:auto;"
+       data-article-picker-suggestions></div>
+</div>
