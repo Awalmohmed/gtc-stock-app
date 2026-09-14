@@ -282,11 +282,29 @@ def import_articles():
   resultat = None
   if request.method == 'POST':
     fichier = request.files.get('fichier')
+    # La référence n'étant unique que PAR MAGASIN (voir Article.__table_args__),
+    # un import cible toujours un seul magasin explicite : celui choisi dans
+    # le formulaire pour un rôle qui voit tous les magasins (Administrateur,
+    # Comptable — voir ROLES_TOUS_MAGASINS), ou son propre magasin de
+    # rattachement pour un Gestionnaire de stock.
+    if session.get('role') in ROLES_TOUS_MAGASINS:
+      magasin_id = request.form.get('magasin_id', type=int)
+      if not magasin_id or db.session.get(Magasin, magasin_id) is None:
+        flash("Merci de sélectionner le magasin dans lequel importer ces articles.", 'danger')
+        return render_template('pages/import_articles.html', segment='fiche_stock', parent='pages',
+                                resultat=resultat, magasins=get_all_magasins())
+    else:
+      utilisateur = get_user_by_identifiant(session.get('identifiant'))
+      magasin_id = utilisateur.magasin_id if utilisateur else None
+      if not magasin_id:
+        flash("Aucun magasin ne vous est rattaché : contactez un administrateur.", 'danger')
+        return redirect(url_for('import_articles'))
+
     if not fichier or not fichier.filename:
       flash("Merci de sélectionner un fichier.", 'danger')
     else:
       try:
-        resultat = importer_fichier(fichier.filename, fichier.read())
+        resultat = importer_fichier(fichier.filename, fichier.read(), magasin_id)
         if resultat['erreurs']:
           flash(
             f"Import terminé avec des erreurs : {resultat['crees']} créé(s), "
@@ -302,7 +320,7 @@ def import_articles():
       except FichierInvalide as e:
         flash(str(e), 'danger')
   return render_template('pages/import_articles.html', segment='fiche_stock', parent='pages',
-                          resultat=resultat)
+                          resultat=resultat, magasins=get_all_magasins())
 
 @app.route('/pages/fiche-stock/import/modele.csv')
 @login_required

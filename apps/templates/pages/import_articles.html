@@ -1,3 +1,17 @@
+{#
+  Import d'articles — route import_articles (GET/POST /pages/fiche-stock/import/),
+  tout rôle connecté. Reçoit : resultat = None en GET, sinon
+  {crees, maj, erreurs:[(ligne, message)]} après traitement (import_articles.importer_fichier) ;
+  magasins (pour le sélecteur, rôles qui voient tous les magasins).
+  Sections : 1) formulaire d'upload .csv/.xlsx (+ magasin cible pour un
+  Administrateur/Comptable — un Gestionnaire importe dans son propre
+  magasin, sans champ à remplir) + lien vers le modèle (import_articles_modele) ;
+  2) carte « Résultat » affichée seulement après un import (compteurs +
+  détail des lignes rejetées).
+  Rappel métier : un import ne modifie JAMAIS la quantité en stock. La
+  référence n'étant unique que PAR MAGASIN (voir apps/models.py,
+  Article.__table_args__), l'import ne touche que le magasin cible.
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Import d'articles{% endblock title %}
@@ -12,8 +26,9 @@
       <p class="text-muted small">
         Fichier <strong>.csv</strong> ou <strong>.xlsx</strong>, avec les colonnes
         <code>nom</code>, <code>reference</code>, <code>seuil</code> et <code>fournisseur</code>
-        (facultative). Si une référence existe déjà, son nom, son seuil et son
-        fournisseur sont mis à jour — <strong>la quantité en stock n'est jamais
+        (facultative). Si une référence existe déjà <strong>dans le magasin de destination</strong>,
+        son nom, son seuil et son fournisseur sont mis à jour (elle peut exister sans
+        conflit dans un autre magasin) — <strong>la quantité en stock n'est jamais
         modifiée par un import</strong> (elle ne change que via une vraie entrée/sortie).
       </p>
       <p class="mb-3">
@@ -23,6 +38,18 @@
       </p>
       <form action="{{ url_for('import_articles') }}" method="post" enctype="multipart/form-data" data-validate novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if current_user.role in ['Administrateur', 'Comptable'] %}
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" for="import-magasin">Magasin de destination</label>
+          <select class="form-select" id="import-magasin" name="magasin_id" required>
+            <option value="" selected disabled>Sélectionner un magasin</option>
+            {% for m in magasins %}
+            <option value="{{ m.id }}">{{ m.nom }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Seuls les articles de ce magasin seront créés/mis à jour.</div>
+        </div>
+        {% endif %}
         <div class="mb-3">
           <input type="file" name="fichier" class="form-control" accept=".csv,.xlsx" required>
         </div>

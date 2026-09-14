@@ -14,9 +14,16 @@ Le stock ne doit changer que via de vrais mouvements d'entrée/sortie
 (voir apps/gtc_data.py, add_entree/add_sortie) — un import ne fait que
 mettre à jour les informations de catalogue.
 
-- Référence déjà connue -> met à jour nom, seuil, fournisseur habituel
-  (et le statut Alerte/OK si l'article n'est pas "Dormant").
-- Référence inconnue -> crée l'article, quantite=0.
+Un import cible TOUJOURS un seul magasin (`magasin_id`, voir
+importer_fichier) — la référence n'étant unique que PAR MAGASIN (voir
+apps/models.py, Article.__table_args__), un import ne doit jamais
+toucher un article d'un autre magasin sous prétexte qu'il porte la même
+référence :
+- Référence déjà connue DANS CE MAGASIN -> met à jour nom, seuil,
+  fournisseur habituel (et le statut Alerte/OK si l'article n'est pas
+  "Dormant").
+- Référence inconnue dans ce magasin (qu'elle existe ou non ailleurs)
+  -> crée l'article dans ce magasin, quantite=0.
 - Fournisseur mentionné mais introuvable dans la table Fournisseur ->
   ligne rejetée (pas de création silencieuse d'un fournisseur).
 - Référence en double dans le même fichier -> seule la première
@@ -152,8 +159,11 @@ def _valider_ligne(ligne, references_vues, fournisseurs_par_nom):
     return {"nom": nom, "reference": reference, "seuil": seuil, "fournisseur_id": fournisseur_id}, None
 
 
-def importer_fichier(nom_fichier, contenu_brut):
-    """Importe un fichier CSV ou Excel d'articles.
+def importer_fichier(nom_fichier, contenu_brut, magasin_id):
+    """Importe un fichier CSV ou Excel d'articles dans le magasin
+    `magasin_id` : toutes les créations/mises à jour sont scopées à ce
+    magasin (voir docstring du module) — un article portant la même
+    référence dans un AUTRE magasin n'est jamais touché.
 
     Retourne un dict : {"crees": int, "maj": int, "erreurs": [(ligne, message), ...]}.
     Lève FichierInvalide si le fichier lui-même est inexploitable
@@ -185,7 +195,9 @@ def importer_fichier(nom_fichier, contenu_brut):
     references_du_fichier = [d["reference"] for d in lignes_valides]
     articles_existants = {
         a.reference: a
-        for a in Article.query.filter(Article.reference.in_(references_du_fichier))
+        for a in Article.query.filter(
+            Article.reference.in_(references_du_fichier), Article.magasin_id == magasin_id,
+        )
     } if references_du_fichier else {}
 
     for donnees in lignes_valides:
@@ -207,7 +219,7 @@ def importer_fichier(nom_fichier, contenu_brut):
             article = Article(
                 nom=donnees["nom"], reference=donnees["reference"], seuil=donnees["seuil"],
                 fournisseur_id=donnees["fournisseur_id"], quantite=0,
-                statut="Alerte", dernier_mouvement="—",
+                statut="Alerte", dernier_mouvement="—", magasin_id=magasin_id,
             )
             db.session.add(article)
             crees += 1
