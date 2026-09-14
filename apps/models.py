@@ -231,8 +231,17 @@ class Entree(db.Model):
     # laisser une valeur vide.
     type_entree = db.Column(db.String(30), nullable=False, server_default="reception_fournisseur")
     fournisseur_id = db.Column(db.Integer, db.ForeignKey("fournisseurs.id"), nullable=True)
+    # reference : nom/référence du client (retour_client seulement — une
+    # réception fournisseur utilise désormais num_bon_livraison_fournisseur
+    # ci-dessous, une colonne dédiée, plutôt que ce champ générique).
     reference = db.Column(db.String(50), nullable=True)
     motif = db.Column(db.String(255), nullable=True)
+    # Les trois champs suivants ne sont renseignés que pour une réception
+    # fournisseur (voir add_entree) — decrivent la livraison physique
+    # elle-même, au-delà du simple document (n° de bon de livraison).
+    numero_vehicule = db.Column(db.String(50), nullable=True)
+    nom_chauffeur = db.Column(db.String(150), nullable=True)
+    num_bon_livraison_fournisseur = db.Column(db.String(50), nullable=True)
     utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
 
     utilisateur = db.relationship("Utilisateur")

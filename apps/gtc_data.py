@@ -482,7 +482,15 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
     # type_entree n'existe que sur Entree (voir apps/models.py) — absent
     # pour une Sortie, d'où le getattr plutôt qu'un accès direct.
     type_entree = getattr(mouvement, "type_entree", None)
-    if type_entree:
+    if type_entree == "reception_fournisseur":
+        ligne["type_entree"] = mouvement.type_entree_libelle
+        ligne["type_entree_classe"] = mouvement.type_entree_classe
+        ligne["detail"] = mouvement.num_bon_livraison_fournisseur or "—"
+        # Affichés en plus du détail sur la fiche de stock seulement (voir
+        # templates/pages/fiche_stock.html) — None ailleurs n'est jamais lu.
+        ligne["numero_vehicule"] = mouvement.numero_vehicule
+        ligne["nom_chauffeur"] = mouvement.nom_chauffeur
+    elif type_entree:
         ligne["type_entree"] = mouvement.type_entree_libelle
         ligne["type_entree_classe"] = mouvement.type_entree_classe
         ligne["detail"] = mouvement.reference or mouvement.motif or "—"
@@ -751,12 +759,17 @@ def _article_mouvementable(article_id):
     return article
 
 
-def add_entree(article_id, date_mouvement, quantite, type_entree, fournisseur_id, reference,
-                motif, utilisateur):
+def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *,
+                magasin_id=None, fournisseur_id=None, reference=None, motif=None,
+                numero_vehicule=None, nom_chauffeur=None, num_bon_livraison_fournisseur=None):
     """Enregistre une entrée de stock et met à jour l'article. `type_entree`
-    (voir TYPES_ENTREE) détermine quels champs sont exigés :
-      - "reception_fournisseur" : fournisseur_id (un fournisseur valide)
-        ET reference (n° de bordereau) ;
+    (voir TYPES_ENTREE) détermine quels champs — tous passés en mots-clés,
+    seuls certains sont exigés selon le type — sont réellement utilisés :
+      - "reception_fournisseur" : magasin_id (le magasin concerné par la
+        réception — doit être celui de l'article), fournisseur_id (un
+        fournisseur valide), numero_vehicule, nom_chauffeur et
+        num_bon_livraison_fournisseur — tous obligatoires : une vraie
+        réception physique a un véhicule, un chauffeur et un document ;
       - "retour_client" : reference (nom/référence du client) ; motif
         (motif du retour) reste facultatif ;
       - "regularisation" : motif obligatoire, réservée aux rôles
@@ -764,7 +777,8 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, fournisseur_id
         pas de fournisseur ni de référence externe (aucun document réel).
 
     Lève ValueError si l'article est introuvable, si `type_entree` est
-    invalide, si un champ obligatoire pour ce type manque, si le rôle de
+    invalide, si un champ obligatoire pour ce type manque, si l'article
+    n'appartient pas au magasin indiqué (réception), si le rôle de
     `utilisateur` n'autorise pas une régularisation, ou si la quantité
     est invalide."""
     article = _article_mouvementable(article_id)
@@ -775,17 +789,30 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, fournisseur_id
 
     reference = (reference or "").strip() or None
     motif = (motif or "").strip() or None
+    numero_vehicule = (numero_vehicule or "").strip() or None
+    nom_chauffeur = (nom_chauffeur or "").strip() or None
+    num_bon_livraison_fournisseur = (num_bon_livraison_fournisseur or "").strip() or None
     fournisseur = None
 
     if type_entree == "reception_fournisseur":
+        if not magasin_id:
+            raise ValueError("Merci d'indiquer le magasin concerné par la réception.")
+        if article.magasin_id != magasin_id:
+            raise ValueError("L'article sélectionné n'appartient pas au magasin concerné par la réception.")
         fournisseur = db.session.get(Fournisseur, fournisseur_id) if fournisseur_id else None
         if not fournisseur:
             raise ValueError("Merci de sélectionner un fournisseur.")
-        if not reference:
-            raise ValueError("Merci d'indiquer le n° de bordereau de réception.")
+        if not numero_vehicule:
+            raise ValueError("Merci d'indiquer le numéro du véhicule de livraison.")
+        if not nom_chauffeur:
+            raise ValueError("Merci d'indiquer le nom du chauffeur.")
+        if not num_bon_livraison_fournisseur:
+            raise ValueError("Merci d'indiquer le numéro du bon de livraison fournisseur.")
+        reference = None  # le n° de BL vit désormais dans sa propre colonne
     elif type_entree == "retour_client":
         if not reference:
             raise ValueError("Merci d'indiquer le nom ou la référence du client.")
+        numero_vehicule = nom_chauffeur = num_bon_livraison_fournisseur = None
     elif type_entree == "regularisation":
         if utilisateur is None or utilisateur.role not in ROLES_REGULARISATION:
             raise ValueError(
@@ -795,12 +822,15 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, fournisseur_id
         if not motif:
             raise ValueError("Merci d'indiquer le motif de la régularisation.")
         reference = None  # pas de document externe pour une régularisation
+        numero_vehicule = nom_chauffeur = num_bon_livraison_fournisseur = None
 
     entree = Entree(
         article_id=article.id, date=date_mouvement, quantite=quantite,
         type_entree=type_entree,
         fournisseur_id=fournisseur.id if fournisseur else None,
         reference=reference, motif=motif,
+        numero_vehicule=numero_vehicule, nom_chauffeur=nom_chauffeur,
+        num_bon_livraison_fournisseur=num_bon_livraison_fournisseur,
         utilisateur_id=utilisateur.id if utilisateur else None,
     )
     article.quantite += quantite

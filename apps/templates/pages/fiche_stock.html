@@ -112,7 +112,16 @@
                 <span class="badge bg-{{ h.type_entree_classe }}-subtle text-{{ h.type_entree_classe }}">{{ h.type_entree }}</span>
                 {% endif %}
               </td>
-              <td>{{ h.detail }}</td>
+              <td>
+                {{ h.detail }}
+                {% if h.numero_vehicule or h.nom_chauffeur %}
+                <div class="small text-muted">
+                  {%- if h.numero_vehicule %}Véhicule {{ h.numero_vehicule }}{% endif -%}
+                  {%- if h.numero_vehicule and h.nom_chauffeur %} — {% endif -%}
+                  {%- if h.nom_chauffeur %}{{ h.nom_chauffeur }}{% endif -%}
+                </div>
+                {% endif %}
+              </td>
               <td>{{ h.quantite }}</td>
               <td>{{ h.solde }}</td>
             </tr>

@@ -79,9 +79,20 @@ def pages_dashboard():
 def pages_entrees():
   # L'article est choisi via un champ de recherche (autocomplétion, voir
   # /pages/articles/recherche) plutôt qu'une liste déroulante -> plus
-  # besoin de charger tous les articles du magasin ici.
+  # besoin de charger tous les articles du magasin ici. `magasins` sert
+  # au champ « Magasin concerné » du bloc Réception fournisseur (rôles
+  # qui voient tous les magasins — voir ROLES_TOUS_MAGASINS ; un
+  # Gestionnaire de stock voit son propre magasin, imposé, sans sélecteur
+  # — magasin_reception_nom le lui affiche : `current_user` (injecté par
+  # apps/auth.py) n'est qu'un dict identifiant/nom/rôle, sans relation
+  # magasin, d'où ce calcul ici plutôt que dans le template).
+  utilisateur = get_user_by_identifiant(session.get('identifiant'))
+  magasin_reception_nom = (
+    utilisateur.magasin.nom if utilisateur and utilisateur.magasin else None
+  )
   return render_template('pages/entrees.html', segment='entrees', parent='pages',
-                          mouvements=get_entrees(), fournisseurs=get_all_fournisseurs())
+                          mouvements=get_entrees(), fournisseurs=get_all_fournisseurs(),
+                          magasins=get_all_magasins(), magasin_reception_nom=magasin_reception_nom)
 
 @app.route('/pages/sorties/')
 @login_required
@@ -108,32 +119,44 @@ def creer_entree():
     if quantite is None:
       raise ValueError("Merci d'indiquer une quantité valide.")
 
-    # Le formulaire n'affiche que les champs pertinents pour le type
-    # d'entrée choisi (voir templates/pages/entrees.html), mais chaque
-    # type utilise un nom de champ différent pour sa « référence » et son
-    # « motif » — on les résout ici avant d'appeler add_entree, qui reste
-    # la seule source de vérité sur ce qui est obligatoire pour chacun.
+    # Le formulaire n'affiche que le bloc de champs pertinent pour le type
+    # d'entrée choisi (voir templates/pages/entrees.html), chaque bloc
+    # ayant ses propres noms de champs (et son propre champ Article) — on
+    # les résout ici avant d'appeler add_entree, qui reste la seule
+    # source de vérité sur ce qui est obligatoire pour chacun.
     type_entree = request.form.get('type_entree') or ''
-    fournisseur_id = request.form.get('fournisseur_id', type=int)
+    magasin_id = None
+    fournisseur_id = None
+    reference = motif = numero_vehicule = nom_chauffeur = num_bon_livraison_fournisseur = None
+
     if type_entree == 'reception_fournisseur':
-      reference = request.form.get('reference_reception')
-      motif = None
+      # Magasin concerné : libre pour un rôle qui voit tous les magasins
+      # (Administrateur, Comptable — voir ROLES_TOUS_MAGASINS), imposé
+      # (son propre magasin) pour un Gestionnaire de stock — même
+      # précaution que pour magasin_source_id (transferer_stock) : jamais
+      # pris tel quel dans le formulaire pour ce dernier.
+      if session.get('role') in ROLES_TOUS_MAGASINS:
+        magasin_id = request.form.get('magasin_id', type=int)
+      else:
+        magasin_id = utilisateur.magasin_id if utilisateur else None
+      fournisseur_id = request.form.get('fournisseur_id', type=int)
+      numero_vehicule = request.form.get('numero_vehicule')
+      nom_chauffeur = request.form.get('nom_chauffeur')
+      num_bon_livraison_fournisseur = request.form.get('num_bon_livraison_fournisseur')
     elif type_entree == 'retour_client':
       reference = request.form.get('reference_client')
       motif = request.form.get('motif_retour')
-      fournisseur_id = None
     elif type_entree == 'regularisation':
-      reference = None
       motif_categorie = (request.form.get('motif_regularisation') or '').strip()
       detail = (request.form.get('motif_regularisation_autre') or '').strip()
       motif = f"Autre : {detail}" if motif_categorie == 'Autre' and detail else motif_categorie
-      fournisseur_id = None
-    else:
-      reference = None
-      motif = None
 
-    add_entree(article_id, date_mouvement, quantite, type_entree, fournisseur_id, reference,
-               motif, utilisateur)
+    add_entree(
+      article_id, date_mouvement, quantite, type_entree, utilisateur,
+      magasin_id=magasin_id, fournisseur_id=fournisseur_id, reference=reference, motif=motif,
+      numero_vehicule=numero_vehicule, nom_chauffeur=nom_chauffeur,
+      num_bon_livraison_fournisseur=num_bon_livraison_fournisseur,
+    )
   except ValueError as e:
     flash(str(e), 'danger')
     return redirect(url_for('pages_entrees'))

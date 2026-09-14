@@ -1,21 +1,33 @@
 {#
   Entrées de stock — route pages_entrees (GET /pages/entrees/), tout rôle
-  connecté. Reçoit : mouvements (get_entrees), fournisseurs.
+  connecté. Reçoit : mouvements (get_entrees), fournisseurs, magasins.
   Sections : 1) formulaire « Nouvelle entrée » -> POST creer_entree ;
   2) tableau des entrées enregistrées (récent -> ancien).
-  Article choisi via un champ de recherche (autocomplétion — voir
-  includes/article-picker.html) plutôt qu'une liste déroulante.
 
   Type d'entrée (voir apps/models.py, TYPES_ENTREE) : le sélecteur en
   tête de formulaire affiche/masque en JS (extra_js ci-dessous) le bloc
-  de champs pertinent — chaque bloc utilise son propre nom de champ
-  (reference_reception / reference_client / motif_regularisation(_autre))
-  plutôt que de réutiliser "reference"/"motif" pour plusieurs blocs à la
-  fois : plus robuste qu'un show/hide seul (un champ masqué mais pas
-  désactivé serait quand même soumis). « Régularisation » n'est proposée
-  qu'à un Administrateur ou un Gestionnaire de stock (voir
-  ROLES_REGULARISATION) — la vérification qui compte reste côté serveur
-  (gtc_data.add_entree).
+  de champs pertinent — CHAQUE BLOC A SA PROPRE RECHERCHE D'ARTICLE
+  (includes/article-picker.html), pas un champ partagé : la Réception
+  fournisseur a besoin de scoper la recherche au magasin choisi (voir
+  ci-dessous), ce qui n'a pas de sens pour les deux autres types. Chaque
+  bloc utilise aussi son propre nom de champ pour sa « référence » et
+  son « motif » plutôt que de réutiliser reference/motif pour plusieurs
+  blocs à la fois : plus robuste qu'un show/hide seul (un champ masqué
+  mais pas désactivé serait quand même soumis, y compris un article_id
+  d'un autre bloc).
+
+  Réception fournisseur : en plus du fournisseur, le magasin concerné
+  par la réception est libre pour un rôle qui voit tous les magasins
+  (Administrateur, Comptable — voir ROLES_TOUS_MAGASINS), imposé pour
+  un Gestionnaire de stock (son propre magasin, non modifiable). La
+  recherche d'article de CE bloc est restreinte à ce magasin
+  (data-magasin-source-input, même mécanisme que le formulaire de
+  Transfert) — pour un Gestionnaire, pas de sélecteur : son magasin
+  s'applique automatiquement côté serveur, comme pour les 2 autres types.
+
+  « Régularisation » n'est proposée qu'à un Administrateur ou un
+  Gestionnaire de stock (voir ROLES_REGULARISATION) — la vérification
+  qui compte reste côté serveur (gtc_data.add_entree).
   Toute validation réelle est côté serveur (gtc_data.add_entree) ; ici
   data-validate = confort.
 #}
@@ -45,12 +57,6 @@
           </select>
         </div>
 
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Article</label>
-          {% set article_picker_id = 'entree-article' %}
-          {% include 'includes/article-picker.html' %}
-        </div>
-
         <div class="row">
           <div class="col-6 mb-2">
             <label class="form-label small fw-semibold">Quantité</label>
@@ -78,15 +84,60 @@
               <a href="{{ url_for('pages_fournisseurs') }}">Gérer les fournisseurs</a>
             </div>
           </div>
+
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Magasin concerné par la réception</label>
+            {% if current_user and current_user.role in ['Administrateur', 'Comptable'] %}
+            <select class="form-select" name="magasin_id" id="entree-reception-magasin"
+                    data-type-entree-champ required>
+              <option value="" selected disabled>Sélectionner un magasin</option>
+              {% for m in magasins %}
+              <option value="{{ m.id }}">{{ m.nom }}</option>
+              {% endfor %}
+            </select>
+            {% elif magasin_reception_nom %}
+            <input type="text" class="form-control" value="{{ magasin_reception_nom }}" disabled>
+            <div class="form-text">Votre magasin de rattachement — non modifiable.</div>
+            {% else %}
+            <p class="text-danger small mb-0">Aucun magasin ne vous est rattaché : contactez un administrateur.</p>
+            {% endif %}
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Article</label>
+            {% set article_picker_id = 'entree-article-reception' %}
+            {% set article_picker_magasin_source_input = 'entree-reception-magasin'
+               if current_user and current_user.role in ['Administrateur', 'Comptable'] else none %}
+            {% include 'includes/article-picker.html' %}
+          </div>
+
+          <div class="row">
+            <div class="col-6 mb-2">
+              <label class="form-label small fw-semibold">N° véhicule de livraison</label>
+              <input type="text" name="numero_vehicule" class="form-control"
+                     placeholder="ex : AB-123-CD" data-type-entree-champ required>
+            </div>
+            <div class="col-6 mb-2">
+              <label class="form-label small fw-semibold">Nom du chauffeur</label>
+              <input type="text" name="nom_chauffeur" class="form-control"
+                     placeholder="ex : Jean Dupont" data-type-entree-champ required>
+            </div>
+          </div>
           <div class="mb-3">
-            <label class="form-label small fw-semibold">N° bordereau de réception</label>
-            <input type="text" name="reference_reception" class="form-control"
-                   placeholder="ex : BR-2026-0143" data-type-entree-champ required>
+            <label class="form-label small fw-semibold">N° bon de livraison fournisseur</label>
+            <input type="text" name="num_bon_livraison_fournisseur" class="form-control"
+                   placeholder="ex : BL-2026-0143" data-type-entree-champ required>
           </div>
         </div>
 
         <!-- Retour client -->
         <div data-type-entree-groupe="retour_client" hidden>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Article</label>
+            {% set article_picker_id = 'entree-article-retour' %}
+            {% set article_picker_magasin_source_input = none %}
+            {% include 'includes/article-picker.html' %}
+          </div>
           <div class="mb-2">
             <label class="form-label small fw-semibold">Nom ou référence du client</label>
             <input type="text" name="reference_client" class="form-control"
@@ -100,6 +151,12 @@
 
         <!-- Régularisation -->
         <div data-type-entree-groupe="regularisation" hidden>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Article</label>
+            {% set article_picker_id = 'entree-article-regularisation' %}
+            {% set article_picker_magasin_source_input = none %}
+            {% include 'includes/article-picker.html' %}
+          </div>
           <div class="mb-2">
             <label class="form-label small fw-semibold">Motif</label>
             <select class="form-select" name="motif_regularisation" id="entree-motif-regul" data-type-entree-champ>
@@ -166,11 +223,14 @@
 
 {% block extra_js %}
 <script>
-  // Affiche/masque les champs pertinents selon le type d'entrée choisi
-  // (voir apps/models.py, TYPES_ENTREE). Désactiver (pas seulement
-  // masquer) les champs du bloc inactif évite qu'ils soient quand même
-  // soumis, et retirer leur `required` évite qu'ils bloquent la
-  // validation native du navigateur alors qu'ils sont invisibles.
+  // Affiche/masque le bloc de champs pertinent selon le type d'entrée
+  // choisi (voir apps/models.py, TYPES_ENTREE). Désactiver (pas
+  // seulement masquer) les champs du bloc inactif évite qu'ils soient
+  // quand même soumis (y compris le champ caché article_id de chaque
+  // recherche d'article — voir data-article-picker-value, un par bloc
+  // puisque chacun a sa propre recherche d'article), et retirer leur
+  // `required` évite qu'ils bloquent la validation native du navigateur
+  // alors qu'ils sont invisibles.
   (function () {
     var selectType = document.getElementById('entree-type');
     var groupes = document.querySelectorAll('[data-type-entree-groupe]');
@@ -185,6 +245,16 @@
           champ.disabled = !actif;
           if (actif) champ.setAttribute('required', 'required');
           else champ.removeAttribute('required');
+        });
+        // Recherche d'article de ce bloc (voir includes/article-picker.html) :
+        // le champ caché article_id (jamais `required`, mais désactivé
+        // quand son bloc est inactif — sinon plusieurs champs "article_id",
+        // un par bloc, seraient soumis à la fois) ET le champ texte visible
+        // (lui EST `required` par défaut — le désactiver aussi est
+        // indispensable, sinon la validation native du formulaire le
+        // bloque à cause d'un champ requis resté invisible mais actif).
+        groupe.querySelectorAll('[data-article-picker-value], [data-article-picker-input]').forEach(function (champ) {
+          champ.disabled = !actif;
         });
       });
     }
