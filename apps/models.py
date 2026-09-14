@@ -232,6 +232,48 @@ class Sortie(db.Model):
         return f"<Sortie article={self.article_id} -{self.quantite}>"
 
 
+class Transfert(db.Model):
+    """Transfert de stock d'un magasin vers un autre (voir
+    apps/gtc_data.py, transferer_stock). Se traduit TOUJOURS par exactement
+    une Sortie (côté magasin_source) et une Entree (côté magasin_destination) —
+    reliées ici pour l'historique, et portant chacune la même `reference`
+    (ex. "TRF-2026-0007") que ce transfert, pour rester reliables même en
+    consultant Entree/Sortie isolément (pages Entrées / Sorties).
+
+    `reference` est le numéro affiché à l'utilisateur (compteur remis à
+    zéro chaque année, voir gtc_data._prochaine_reference_transfert)."""
+
+    __tablename__ = "transferts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    reference = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    date = db.Column(db.Date, nullable=False)
+    quantite = db.Column(db.Integer, nullable=False)
+    magasin_source_id = db.Column(db.Integer, db.ForeignKey("magasins.id"), nullable=False)
+    magasin_destination_id = db.Column(db.Integer, db.ForeignKey("magasins.id"), nullable=False)
+    # Article tel qu'il existe dans chaque magasin — deux lignes Article
+    # distinctes (même référence/désignation, chacune unique dans son
+    # magasin depuis l'Étape 0) ; article_destination a pu être créé par
+    # ce transfert lui-même s'il n'existait pas encore là-bas (voir
+    # transferer_stock).
+    article_source_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
+    article_destination_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
+    sortie_id = db.Column(db.Integer, db.ForeignKey("sorties.id"), unique=True, nullable=False)
+    entree_id = db.Column(db.Integer, db.ForeignKey("entrees.id"), unique=True, nullable=False)
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
+
+    magasin_source = db.relationship("Magasin", foreign_keys=[magasin_source_id])
+    magasin_destination = db.relationship("Magasin", foreign_keys=[magasin_destination_id])
+    article_source = db.relationship("Article", foreign_keys=[article_source_id])
+    article_destination = db.relationship("Article", foreign_keys=[article_destination_id])
+    sortie = db.relationship("Sortie")
+    entree = db.relationship("Entree")
+    utilisateur = db.relationship("Utilisateur")
+
+    def __repr__(self):
+        return f"<Transfert {self.reference} {self.magasin_source_id}->{self.magasin_destination_id}>"
+
+
 # Libellé + classe Bootstrap affichés pour chaque type d'action du
 # journal d'activité (voir JournalActivite ci-dessous).
 ACTIONS_JOURNAL = {
@@ -242,6 +284,7 @@ ACTIONS_JOURNAL = {
     "reinit_mot_de_passe": ("Réinitialisation mot de passe", "warning"),
     "entree_stock": ("Entrée de stock", "success"),
     "sortie_stock": ("Sortie de stock", "danger"),
+    "transfert_stock": ("Transfert inter-magasin", "primary"),
     "archive_article": ("Archivage article", "secondary"),
     "desarchive_article": ("Désarchivage article", "secondary"),
     "suppression_article": ("Suppression définitive article", "danger"),

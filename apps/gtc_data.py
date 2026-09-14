@@ -12,13 +12,13 @@ apps/models.py et apps/config.py).
 from datetime import datetime
 
 from flask import session
-from sqlalchemy import false as sa_false
+from sqlalchemy import false as sa_false, or_ as sa_or
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from apps import db
 from apps.models import (
-    Utilisateur, Article, Entree, Sortie, Fournisseur, JournalActivite,
+    Utilisateur, Article, Entree, Sortie, Transfert, Fournisseur, JournalActivite,
     Magasin, Alerte, ROLE_CLASSES, ROLES_TOUS_MAGASINS,
 )
 from apps import sage_connector
@@ -762,6 +762,176 @@ def add_sortie(article_id, date_mouvement, quantite, type_document, reference, u
         # sortie (mailer.envoyer_alerte_seuil n'élève jamais d'exception).
         mailer.envoyer_alerte_seuil(article)
     return sortie
+
+
+# ---------------------------------------------------------------------
+# Transferts inter-magasins
+# ---------------------------------------------------------------------
+
+def _prochaine_reference_transfert(annee):
+    """Prochain numéro de transfert pour `annee`, sous la forme
+    "TRF-AAAA-00xx" — compteur remis à zéro chaque année civile. Cherche
+    le plus grand suffixe déjà attribué cette année-là (pas un simple
+    COUNT(*)) pour rester correct même si un transfert venait un jour à
+    être supprimé."""
+    prefixe = f"TRF-{annee}-"
+    suffixes = [
+        int(t.reference[len(prefixe):])
+        for t in Transfert.query.filter(Transfert.reference.like(f"{prefixe}%")).all()
+    ]
+    return f"{prefixe}{(max(suffixes) + 1 if suffixes else 1):04d}"
+
+
+def transferer_stock(magasin_source_id, magasin_destination_id, article_id, quantite,
+                      date_mouvement, utilisateur):
+    """Transfère `quantite` unités de l'article `article_id` (doit
+    appartenir au magasin source) du magasin source vers le magasin
+    destination, en une seule opération atomique :
+      - décrémente le stock dans le magasin source, comme une sortie (la
+        quantité ne peut jamais devenir négative) ;
+      - si l'article (même référence) n'existe pas encore dans le magasin
+        destination, le crée (même désignation, même fournisseur habituel,
+        seuil d'alerte à 0 par défaut — à ajuster ensuite via
+        « Modifier ») ; sinon incrémente sa quantité, comme une entrée ;
+      - génère une Sortie (côté source) et une Entree (côté destination)
+        portant toutes deux la même référence de transfert
+        (TRF-AAAA-00xx), et une ligne Transfert qui les relie pour
+        l'historique (voir get_transferts) ;
+      - journalise l'opération (voir _journaliser).
+
+    Lève ValueError si un magasin est introuvable, si les deux magasins
+    sont identiques, si l'article est introuvable dans le magasin source
+    ou y est archivé, si la quantité est invalide ou dépasse le stock
+    disponible, ou si un article archivé de même référence bloque déjà
+    la place dans le magasin destination (à désarchiver d'abord — même
+    logique que _article_mouvementable)."""
+    magasin_source = db.session.get(Magasin, magasin_source_id)
+    magasin_destination = db.session.get(Magasin, magasin_destination_id)
+    if magasin_source is None or magasin_destination is None:
+        raise ValueError("Magasin source ou destination introuvable.")
+    if magasin_source_id == magasin_destination_id:
+        raise ValueError("Le magasin source et le magasin destination doivent être différents.")
+
+    article_source = db.session.get(Article, article_id)
+    if article_source is None or article_source.magasin_id != magasin_source_id:
+        raise ValueError("Article introuvable dans le magasin source.")
+    if article_source.archive:
+        raise ValueError(
+            f"L'article « {article_source.nom} » est archivé : aucun mouvement ne peut y être "
+            "enregistré. Désarchivez-le d'abord."
+        )
+    if quantite is None or quantite <= 0:
+        raise ValueError("La quantité doit être supérieure à zéro.")
+    if quantite > article_source.quantite:
+        raise ValueError(
+            f"Stock insuffisant : {article_source.quantite} disponible(s) pour "
+            f"« {article_source.nom} », {quantite} demandé(s)."
+        )
+
+    article_destination = Article.query.filter_by(
+        reference=article_source.reference, magasin_id=magasin_destination_id
+    ).first()
+    if article_destination is not None and article_destination.archive:
+        raise ValueError(
+            f"L'article « {article_destination.nom} » est archivé dans le magasin "
+            f"« {magasin_destination.nom} » : désarchivez-le d'abord pour y recevoir ce transfert."
+        )
+
+    reference_transfert = _prochaine_reference_transfert(date_mouvement.year)
+
+    # --- Côté source : comme une sortie ---
+    sortie = Sortie(
+        article_id=article_source.id, date=date_mouvement, quantite=quantite,
+        type_document="Transfert inter-magasin", reference=reference_transfert,
+        utilisateur_id=utilisateur.id if utilisateur else None,
+    )
+    statut_avant = article_source.statut
+    article_source.quantite -= quantite
+    article_source.dernier_mouvement = date_mouvement.strftime("%d/%m/%Y")
+    _recalculer_statut(article_source)
+    # Même logique que add_sortie : notifier seulement sur la transition
+    # vers "Alerte", pas à chaque transfert tant qu'il y reste.
+    bascule_en_alerte = statut_avant != "Alerte" and article_source.statut == "Alerte"
+    db.session.add(sortie)
+
+    # --- Côté destination : crée l'article si besoin, comme une entrée ---
+    if article_destination is None:
+        article_destination = Article(
+            nom=article_source.nom, reference=article_source.reference,
+            seuil=0, quantite=0, fournisseur_id=article_source.fournisseur_id,
+            magasin_id=magasin_destination_id, statut="OK", dernier_mouvement="—",
+        )
+        db.session.add(article_destination)
+        db.session.flush()  # récupère article_destination.id pour l'entrée ci-dessous
+
+    entree = Entree(
+        article_id=article_destination.id, date=date_mouvement, quantite=quantite,
+        fournisseur_id=None, reference=reference_transfert,
+        utilisateur_id=utilisateur.id if utilisateur else None,
+    )
+    article_destination.quantite += quantite
+    article_destination.dernier_mouvement = date_mouvement.strftime("%d/%m/%Y")
+    _recalculer_statut(article_destination)
+    db.session.add(entree)
+
+    # Flush : récupère sortie.id / entree.id, nécessaires pour la ligne
+    # Transfert ci-dessous, sans encore valider — tout doit réussir ou
+    # rien : un transfert est une seule opération atomique (un seul commit).
+    db.session.flush()
+
+    transfert = Transfert(
+        reference=reference_transfert, date=date_mouvement, quantite=quantite,
+        magasin_source_id=magasin_source_id, magasin_destination_id=magasin_destination_id,
+        article_source_id=article_source.id, article_destination_id=article_destination.id,
+        sortie_id=sortie.id, entree_id=entree.id,
+        utilisateur_id=utilisateur.id if utilisateur else None,
+    )
+    db.session.add(transfert)
+
+    _journaliser(
+        utilisateur, "transfert_stock",
+        f"Transfert {reference_transfert} de {quantite} « {article_source.nom} » "
+        f"({article_source.reference}) du magasin « {magasin_source.nom} » "
+        f"vers « {magasin_destination.nom} ».",
+    )
+    db.session.commit()
+
+    if bascule_en_alerte:
+        # Après le commit, même précaution que add_sortie : un échec
+        # d'envoi ne doit jamais annuler le transfert.
+        mailer.envoyer_alerte_seuil(article_source)
+    return transfert
+
+
+def get_transferts():
+    """Historique des transferts inter-magasins, du plus récent au plus
+    ancien, restreint au périmètre magasin courant (voir _scope_magasin) :
+    un Gestionnaire de stock voit les transferts où son magasin est
+    source OU destination (ce qu'il a envoyé ET ce qu'il a reçu)."""
+    query = Transfert.query
+    mode, magasin_id = _scope_magasin()
+    if mode == "magasin":
+        query = query.filter(sa_or(
+            Transfert.magasin_source_id == magasin_id,
+            Transfert.magasin_destination_id == magasin_id,
+        ))
+    elif mode == "aucun":
+        query = query.filter(sa_false())
+    transferts = query.order_by(Transfert.date.desc(), Transfert.id.desc()).all()
+    return [
+        {
+            "reference": t.reference,
+            "date": t.date.strftime("%d/%m/%Y"),
+            "date_tri": t.date,
+            "id_tri": t.id,
+            "article": t.article_source.nom,
+            "magasin_source": t.magasin_source.nom,
+            "magasin_destination": t.magasin_destination.nom,
+            "quantite": t.quantite,
+            "utilisateur": t.utilisateur.nom if t.utilisateur else "—",
+        }
+        for t in transferts
+    ]
 
 
 def get_all_users():
