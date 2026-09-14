@@ -1,0 +1,180 @@
+{#
+  Transferts inter-magasins — route pages_transferts (GET /pages/transferts/),
+  réservée à un Gestionnaire de stock ou un Administrateur (@roles_required).
+  Reçoit : magasins (tous, pour les sélecteurs), transferts (get_transferts,
+  déjà restreint au périmètre courant), magasin_source_impose/_nom (magasin
+  source imposé — le sien — pour un Gestionnaire ; None pour un
+  Administrateur, qui choisit librement), articles_source (articles du
+  magasin imposé, Gestionnaire seulement), articles_par_magasin (Administrateur
+  seulement : {magasin_id: [{id, nom, reference, quantite}, ...]} pour
+  peupler en cascade le sélecteur d'article en JS quand le magasin source
+  change, sans recharger la page).
+  Sections : 1) formulaire « Nouveau transfert » -> POST creer_transfert ;
+  2) tableau de l'historique des transferts (récent -> ancien).
+  Toute validation réelle (stock disponible, magasins distincts, article
+  bien dans le magasin source...) est côté serveur (gtc_data.transferer_stock) ;
+  ici data-validate = confort.
+#}
+{% extends 'layouts/gtc-base.html' %}
+
+{% block title %}GTC Stock - Transferts{% endblock title %}
+{% block page_title %}Transferts inter-magasins{% endblock page_title %}
+
+{% block content %}
+
+<div class="row g-3">
+  <!-- Formulaire Transfert -->
+  <div class="col-md-6">
+    <div class="card table-card p-3 h-100">
+      <h6 class="mb-3"><i class="bi bi-arrow-left-right text-primary"></i> Nouveau transfert</h6>
+
+      {% if magasins|length < 2 %}
+      <p class="text-muted small">Au moins deux magasins sont nécessaires pour effectuer un transfert.</p>
+      {% else %}
+      <form action="{{ url_for('creer_transfert') }}" method="post" data-validate novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Magasin source</label>
+          {% if est_admin %}
+          <select class="form-select" id="trf-magasin-source" name="magasin_source_id" required>
+            <option value="" selected disabled>Sélectionner le magasin source</option>
+            {% for m in magasins %}
+            <option value="{{ m.id }}">{{ m.nom }}</option>
+            {% endfor %}
+          </select>
+          {% elif magasin_source_impose %}
+          <input type="text" class="form-control" value="{{ magasin_source_nom }}" disabled>
+          <div class="form-text">Votre magasin de rattachement — non modifiable.</div>
+          {% else %}
+          <p class="text-danger small mb-0">Aucun magasin ne vous est rattaché : contactez un administrateur.</p>
+          {% endif %}
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Magasin destination</label>
+          <select class="form-select" id="trf-magasin-destination" name="magasin_destination_id" required>
+            <option value="" selected disabled>Sélectionner le magasin destination</option>
+            {% for m in magasins %}
+            <option value="{{ m.id }}">{{ m.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Article</label>
+          <select class="form-select" id="trf-article" name="article_id" required
+                  {% if not magasin_source_impose %}disabled{% endif %}>
+            <option value="" selected disabled>
+              {% if magasin_source_impose %}Sélectionner un article{% else %}Choisissez d'abord le magasin source{% endif %}
+            </option>
+            {% for a in articles_source %}
+            <option value="{{ a.id }}">{{ a.nom }} — {{ a.reference }} ({{ a.quantite }} en stock)</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="row">
+          <div class="col-6 mb-2">
+            <label class="form-label small fw-semibold">Quantité</label>
+            <input type="number" name="quantite" min="1" class="form-control" placeholder="0" required>
+          </div>
+          <div class="col-6 mb-2">
+            <label class="form-label small fw-semibold">Date</label>
+            <input type="date" name="date" class="form-control" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 fw-semibold mt-2">Effectuer le transfert</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Historique -->
+<div class="card table-card p-3 mt-4">
+  <h6 class="mb-3">Historique des transferts</h6>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead class="text-muted small">
+        <tr>
+          <th>Référence</th>
+          <th>Date</th>
+          <th>Article</th>
+          <th>De</th>
+          <th>Vers</th>
+          <th>Quantité</th>
+          <th>Effectué par</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transferts %}
+        <tr>
+          <td class="text-nowrap"><code>{{ t.reference }}</code></td>
+          <td>{{ t.date }}</td>
+          <td>{{ t.article }}</td>
+          <td>{{ t.magasin_source }}</td>
+          <td>{{ t.magasin_destination }}</td>
+          <td>{{ t.quantite }}</td>
+          <td>{{ t.utilisateur }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-muted text-center">Aucun transfert enregistré.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+{% if est_admin and magasins|length >= 2 %}
+<script>
+  // Sélecteur en cascade (Administrateur seulement) : la liste des articles
+  // dépend du magasin source choisi — peuplée depuis articles_par_magasin
+  // (rendu côté serveur, pas d'appel réseau) sans recharger la page.
+  var ARTICLES_PAR_MAGASIN = {{ articles_par_magasin|tojson }};
+  var selectMagasinSource = document.getElementById('trf-magasin-source');
+  var selectArticle = document.getElementById('trf-article');
+
+  if (selectMagasinSource && selectArticle) {
+    selectMagasinSource.addEventListener('change', function () {
+      var articles = ARTICLES_PAR_MAGASIN[selectMagasinSource.value] || [];
+      selectArticle.innerHTML = '';
+      var optionVide = document.createElement('option');
+      optionVide.value = '';
+      optionVide.selected = true;
+      optionVide.disabled = true;
+      optionVide.textContent = articles.length
+        ? 'Sélectionner un article'
+        : 'Aucun article actif dans ce magasin';
+      selectArticle.appendChild(optionVide);
+      articles.forEach(function (a) {
+        var option = document.createElement('option');
+        option.value = a.id;
+        option.textContent = a.nom + ' — ' + a.reference + ' (' + a.quantite + ' en stock)';
+        selectArticle.appendChild(option);
+      });
+      selectArticle.disabled = articles.length === 0;
+    });
+  }
+
+  // Confort : empêche de choisir le même magasin en source et en
+  // destination (la validation qui compte reste côté serveur).
+  var selectMagasinDestination = document.getElementById('trf-magasin-destination');
+  function masquerMagasinSourceDansDestination() {
+    if (!selectMagasinSource || !selectMagasinDestination) return;
+    Array.prototype.forEach.call(selectMagasinDestination.options, function (option) {
+      if (!option.value) return;
+      option.hidden = option.value === selectMagasinSource.value;
+      if (option.hidden && option.selected) selectMagasinDestination.value = '';
+    });
+  }
+  if (selectMagasinSource) {
+    selectMagasinSource.addEventListener('change', masquerMagasinSourceDansDestination);
+  }
+</script>
+{% endif %}
+{% endblock extra_js %}

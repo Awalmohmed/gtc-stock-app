@@ -2,7 +2,8 @@
   Navigation latérale commune à toutes les pages connectées (incluse par
   layouts/gtc-base.html). Le lien actif est déduit de la variable `segment`
   passée par chaque route (ex. segment='articles'). Les entrées « Magasins »
-  et « Journal d'activité » ne sont rendues que pour un Administrateur.
+  et « Journal d'activité » ne sont rendues que pour un Administrateur ;
+  « Transferts » pour un Gestionnaire de stock ou un Administrateur.
 #}
 <div class="sidebar p-3" style="width:230px;">
   <div class="brand"><i class="bi bi-box-seam"></i> GTC Stock</div>
@@ -16,6 +17,11 @@
     <a class="nav-link {% if 'sorties' in segment %}active{% endif %}" href="{{ url_for('pages_sorties') }}">
       <i class="bi bi-box-arrow-up me-2"></i> Sorties
     </a>
+    {% if current_user and current_user.role in ['Gestionnaire de stock', 'Administrateur'] %}
+    <a class="nav-link {% if 'transferts' in segment %}active{% endif %}" href="{{ url_for('pages_transferts') }}">
+      <i class="bi bi-arrow-left-right me-2"></i> Transferts
+    </a>
+    {% endif %}
     <a class="nav-link {% if 'fournisseurs' in segment %}active{% endif %}" href="{{ url_for('pages_fournisseurs') }}">
       <i class="bi bi-truck me-2"></i> Fournisseurs
     </a>

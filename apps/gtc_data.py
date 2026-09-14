@@ -322,6 +322,22 @@ def get_articles_archives():
     ).order_by(Article.nom).all()
 
 
+def get_articles_par_magasin():
+    """Articles actifs (non archivés) de TOUS les magasins, regroupés par
+    magasin_id — pour le sélecteur en cascade (magasin source -> article)
+    du formulaire de transfert (voir pages/transferts.html). Volontairement
+    HORS du périmètre magasin courant (_scope_magasin) : un Administrateur
+    doit pouvoir choisir n'importe quel magasin comme source, quel que soit
+    le magasin sélectionné dans le filtre de la barre supérieure."""
+    resultat = {}
+    for a in Article.query.filter(Article.archive.is_(False)).order_by(Article.nom).all():
+        if a.magasin_id:
+            resultat.setdefault(a.magasin_id, []).append(
+                {"id": a.id, "nom": a.nom, "reference": a.reference, "quantite": a.quantite}
+            )
+    return resultat
+
+
 def get_article(article_id, inclure_archives=False):
     """Retourne l'article correspondant à l'id, ou None si absent,
     invalide, hors du périmètre magasin de l'utilisateur courant, ou

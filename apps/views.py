@@ -17,7 +17,8 @@ from apps.gtc_data import (
   get_all_fournisseurs, add_fournisseur, get_journal, vider_journal, get_alertes, traiter_alerte,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
   maj_magasin, add_article, maj_article, archiver_article, desarchiver_article,
-  supprimer_definitivement_article, get_articles_archives,
+  supprimer_definitivement_article, get_articles_archives, get_articles_par_magasin,
+  transferer_stock, get_transferts,
   verify_credentials, add_user, maj_utilisateur, basculer_statut_utilisateur,
   reinitialiser_mot_de_passe, get_user_by_identifiant,
 )
@@ -131,6 +132,63 @@ def creer_sortie():
     return redirect(url_for('pages_sorties'))
   flash("Sortie de stock enregistrée avec succès.", 'success')
   return redirect(url_for('pages_sorties'))
+
+@app.route('/pages/transferts/')
+@roles_required('Gestionnaire de stock', 'Administrateur')
+def pages_transferts():
+  utilisateur = get_user_by_identifiant(session.get('identifiant'))
+  est_admin = session.get('role') == 'Administrateur'
+  # Magasin source : libre pour un Administrateur (sélecteur + articles de
+  # TOUS les magasins pour le peuplement en cascade côté JS) ; imposé et
+  # non modifiable pour un Gestionnaire de stock (son propre magasin —
+  # aucun sélecteur affiché, voir le template).
+  if est_admin:
+    magasin_source_impose = None
+    magasin_source_nom = None
+    articles_source = []
+    articles_par_magasin = get_articles_par_magasin()
+  else:
+    magasin_source_impose = utilisateur.magasin_id if utilisateur else None
+    magasin_source_nom = utilisateur.magasin.nom if utilisateur and utilisateur.magasin else None
+    articles_source = get_all_articles() if magasin_source_impose else []
+    articles_par_magasin = {}
+  return render_template(
+    'pages/transferts.html', segment='transferts', parent='pages',
+    magasins=get_all_magasins(), transferts=get_transferts(), est_admin=est_admin,
+    magasin_source_impose=magasin_source_impose, magasin_source_nom=magasin_source_nom,
+    articles_source=articles_source, articles_par_magasin=articles_par_magasin,
+  )
+
+@app.route('/pages/transferts/nouveau', methods=['POST'])
+@roles_required('Gestionnaire de stock', 'Administrateur')
+def creer_transfert():
+  utilisateur = get_user_by_identifiant(session.get('identifiant'))
+  # Magasin source : jamais pris tel quel dans le formulaire pour un
+  # Gestionnaire de stock (son propre magasin est imposé côté serveur,
+  # même si le champ était absent/altéré côté client) — même précaution
+  # que creer_article pour magasin_id.
+  if session.get('role') == 'Administrateur':
+    magasin_source_id = request.form.get('magasin_source_id', type=int)
+  else:
+    magasin_source_id = utilisateur.magasin_id if utilisateur else None
+    if not magasin_source_id:
+      flash("Aucun magasin ne vous est rattaché : contactez un administrateur.", 'danger')
+      return redirect(url_for('pages_transferts'))
+  try:
+    magasin_destination_id = request.form.get('magasin_destination_id', type=int)
+    article_id = request.form.get('article_id', type=int)
+    quantite = request.form.get('quantite', type=int)
+    date_mouvement = _parser_date_formulaire(request.form.get('date') or '')
+    if quantite is None:
+      raise ValueError("Merci d'indiquer une quantité valide.")
+    transfert = transferer_stock(
+      magasin_source_id, magasin_destination_id, article_id, quantite, date_mouvement, utilisateur,
+    )
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_transferts'))
+  flash(f"Transfert {transfert.reference} enregistré avec succès ({quantite} unité(s)).", 'success')
+  return redirect(url_for('pages_transferts'))
 
 @app.route('/pages/fiche-stock/')
 @login_required
