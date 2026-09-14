@@ -127,7 +127,8 @@ def creer_entree():
     type_entree = request.form.get('type_entree') or ''
     magasin_id = None
     fournisseur_id = None
-    reference = motif = numero_vehicule = nom_chauffeur = num_bon_livraison_fournisseur = None
+    reference = motif = numero_vehicule = nom_chauffeur = None
+    num_bon_livraison_fournisseur = num_bordereau_reception = None
 
     if type_entree == 'reception_fournisseur':
       # Magasin concerné : libre pour un rôle qui voit tous les magasins
@@ -143,6 +144,7 @@ def creer_entree():
       numero_vehicule = request.form.get('numero_vehicule')
       nom_chauffeur = request.form.get('nom_chauffeur')
       num_bon_livraison_fournisseur = request.form.get('num_bon_livraison_fournisseur')
+      num_bordereau_reception = request.form.get('num_bordereau_reception')
     elif type_entree == 'retour_client':
       reference = request.form.get('reference_client')
       motif = request.form.get('motif_retour')
@@ -156,6 +158,7 @@ def creer_entree():
       magasin_id=magasin_id, fournisseur_id=fournisseur_id, reference=reference, motif=motif,
       numero_vehicule=numero_vehicule, nom_chauffeur=nom_chauffeur,
       num_bon_livraison_fournisseur=num_bon_livraison_fournisseur,
+      num_bordereau_reception=num_bordereau_reception,
     )
   except ValueError as e:
     flash(str(e), 'danger')

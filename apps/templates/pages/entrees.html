@@ -123,10 +123,19 @@
                      placeholder="ex : Jean Dupont" data-type-entree-champ required>
             </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">N° bon de livraison fournisseur</label>
-            <input type="text" name="num_bon_livraison_fournisseur" class="form-control"
-                   placeholder="ex : BL-2026-0143" data-type-entree-champ required>
+          <div class="row">
+            <div class="col-6 mb-3">
+              <label class="form-label small fw-semibold">N° bon de livraison fournisseur</label>
+              <input type="text" name="num_bon_livraison_fournisseur" class="form-control"
+                     placeholder="ex : BL-2026-0143" data-type-entree-champ required>
+              <div class="form-text">Émis par le fournisseur, accompagne la marchandise.</div>
+            </div>
+            <div class="col-6 mb-3">
+              <label class="form-label small fw-semibold">N° bordereau de réception</label>
+              <input type="text" name="num_bordereau_reception" class="form-control"
+                     placeholder="ex : BR-2026-0143" data-type-entree-champ required>
+              <div class="form-text">Établi en interne à la réception.</div>
+            </div>
           </div>
         </div>
 

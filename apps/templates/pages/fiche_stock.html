@@ -114,6 +114,9 @@
               </td>
               <td>
                 {{ h.detail }}
+                {% if h.num_bordereau_reception %}
+                <div class="small text-muted">Bordereau {{ h.num_bordereau_reception }}</div>
+                {% endif %}
                 {% if h.numero_vehicule or h.nom_chauffeur %}
                 <div class="small text-muted">
                   {%- if h.numero_vehicule %}Véhicule {{ h.numero_vehicule }}{% endif -%}

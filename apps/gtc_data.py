@@ -490,6 +490,7 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
         # templates/pages/fiche_stock.html) — None ailleurs n'est jamais lu.
         ligne["numero_vehicule"] = mouvement.numero_vehicule
         ligne["nom_chauffeur"] = mouvement.nom_chauffeur
+        ligne["num_bordereau_reception"] = mouvement.num_bordereau_reception
     elif type_entree:
         ligne["type_entree"] = mouvement.type_entree_libelle
         ligne["type_entree_classe"] = mouvement.type_entree_classe
@@ -761,15 +762,19 @@ def _article_mouvementable(article_id):
 
 def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *,
                 magasin_id=None, fournisseur_id=None, reference=None, motif=None,
-                numero_vehicule=None, nom_chauffeur=None, num_bon_livraison_fournisseur=None):
+                numero_vehicule=None, nom_chauffeur=None, num_bon_livraison_fournisseur=None,
+                num_bordereau_reception=None):
     """Enregistre une entrée de stock et met à jour l'article. `type_entree`
     (voir TYPES_ENTREE) détermine quels champs — tous passés en mots-clés,
     seuls certains sont exigés selon le type — sont réellement utilisés :
       - "reception_fournisseur" : magasin_id (le magasin concerné par la
         réception — doit être celui de l'article), fournisseur_id (un
-        fournisseur valide), numero_vehicule, nom_chauffeur et
-        num_bon_livraison_fournisseur — tous obligatoires : une vraie
-        réception physique a un véhicule, un chauffeur et un document ;
+        fournisseur valide), numero_vehicule, nom_chauffeur,
+        num_bon_livraison_fournisseur ET num_bordereau_reception — tous
+        obligatoires : une vraie réception physique a un véhicule, un
+        chauffeur, et DEUX documents distincts (le bon de livraison,
+        émis par le fournisseur, et le bordereau de réception, établi en
+        interne — jamais l'un pour l'autre) ;
       - "retour_client" : reference (nom/référence du client) ; motif
         (motif du retour) reste facultatif ;
       - "regularisation" : motif obligatoire, réservée aux rôles
@@ -792,6 +797,7 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *
     numero_vehicule = (numero_vehicule or "").strip() or None
     nom_chauffeur = (nom_chauffeur or "").strip() or None
     num_bon_livraison_fournisseur = (num_bon_livraison_fournisseur or "").strip() or None
+    num_bordereau_reception = (num_bordereau_reception or "").strip() or None
     fournisseur = None
 
     if type_entree == "reception_fournisseur":
@@ -808,11 +814,14 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *
             raise ValueError("Merci d'indiquer le nom du chauffeur.")
         if not num_bon_livraison_fournisseur:
             raise ValueError("Merci d'indiquer le numéro du bon de livraison fournisseur.")
-        reference = None  # le n° de BL vit désormais dans sa propre colonne
+        if not num_bordereau_reception:
+            raise ValueError("Merci d'indiquer le numéro du bordereau de réception.")
+        reference = None  # ces deux numéros vivent désormais dans leurs propres colonnes
     elif type_entree == "retour_client":
         if not reference:
             raise ValueError("Merci d'indiquer le nom ou la référence du client.")
         numero_vehicule = nom_chauffeur = num_bon_livraison_fournisseur = None
+        num_bordereau_reception = None
     elif type_entree == "regularisation":
         if utilisateur is None or utilisateur.role not in ROLES_REGULARISATION:
             raise ValueError(
@@ -823,6 +832,7 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *
             raise ValueError("Merci d'indiquer le motif de la régularisation.")
         reference = None  # pas de document externe pour une régularisation
         numero_vehicule = nom_chauffeur = num_bon_livraison_fournisseur = None
+        num_bordereau_reception = None
 
     entree = Entree(
         article_id=article.id, date=date_mouvement, quantite=quantite,
@@ -831,6 +841,7 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *
         reference=reference, motif=motif,
         numero_vehicule=numero_vehicule, nom_chauffeur=nom_chauffeur,
         num_bon_livraison_fournisseur=num_bon_livraison_fournisseur,
+        num_bordereau_reception=num_bordereau_reception,
         utilisateur_id=utilisateur.id if utilisateur else None,
     )
     article.quantite += quantite
