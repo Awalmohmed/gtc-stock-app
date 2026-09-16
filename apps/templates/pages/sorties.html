@@ -4,8 +4,23 @@
   Sections : 1) formulaire « Nouvelle sortie » -> POST creer_sortie ;
   2) tableau des sorties enregistrées (récent -> ancien).
   Article choisi via un champ de recherche (autocomplétion — voir
-  includes/article-picker.html) plutôt qu'une liste déroulante.
-  Toute validation réelle (stock suffisant, article mouvementable...) est
+  includes/article-picker.html) plutôt qu'une liste déroulante ; ce champ
+  est commun aux deux types (pas de scope par magasin nécessaire ici,
+  contrairement à la Réception fournisseur du formulaire d'entrée).
+
+  Type de sortie (voir apps/models.py, TYPES_SORTIE), même principe que
+  le formulaire d'entrée (entrees.html) : le sélecteur en tête de
+  formulaire affiche/masque le bloc de champs pertinent — logique
+  générique (data-type-toggle-*, voir static/assets/js/gtc-stock.js,
+  section 6), pas de script propre à cette page :
+    - Mouvement de sortie : justificatif (type de document + n° du
+      document) — comportement standard, inchangé ;
+    - Régularisation : motif obligatoire (liste + « Autre », même
+      mécanisme générique data-motif-regularisation, section 7) —
+      réservée à un Administrateur ou un Gestionnaire de stock (voir
+      ROLES_REGULARISATION), pas de justificatif classique.
+  Toute validation réelle (stock suffisant, article mouvementable,
+  champs obligatoires par type, rôle pour une régularisation...) est
   côté serveur (gtc_data.add_sortie) ; ici data-validate = confort.
 #}
 {% extends 'layouts/gtc-base.html' %}
@@ -22,11 +37,23 @@
       <h6 class="mb-3"><i class="bi bi-box-arrow-up text-danger"></i> Nouvelle sortie</h6>
       <form action="{{ url_for('creer_sortie') }}" method="post" data-validate novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Type de sortie</label>
+          <select class="form-select" name="type_sortie" data-type-toggle-select required>
+            <option value="mouvement_sortie" selected>Mouvement de sortie</option>
+            {% if current_user and current_user.role in ['Administrateur', 'Gestionnaire de stock'] %}
+            <option value="regularisation">Régularisation</option>
+            {% endif %}
+          </select>
+        </div>
+
         <div class="mb-2">
           <label class="form-label small fw-semibold">Article</label>
           {% set article_picker_id = 'sortie-article' %}
           {% include 'includes/article-picker.html' %}
         </div>
+
         <div class="row">
           <div class="col-6 mb-2">
             <label class="form-label small fw-semibold">Quantité</label>
@@ -37,18 +64,44 @@
             <input type="date" name="date" class="form-control" required>
           </div>
         </div>
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Justificatif</label>
-          <select class="form-select" name="type_document" required>
-            <option value="" selected disabled>Type de document</option>
-            <option>Bon de livraison</option>
-            <option>Bordereau de route</option>
-          </select>
+
+        <!-- Mouvement de sortie -->
+        <div data-type-toggle-groupe="mouvement_sortie">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Justificatif</label>
+            <select class="form-select" name="type_document" data-type-toggle-champ required>
+              <option value="" selected disabled>Type de document</option>
+              <option>Bon de livraison</option>
+              <option>Bordereau de route</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">N° du document</label>
+            <input type="text" name="reference" class="form-control" placeholder="ex : BL-2026-0087"
+                   data-type-toggle-champ>
+          </div>
         </div>
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">N° du document</label>
-          <input type="text" name="reference" class="form-control" placeholder="ex : BL-2026-0087" required>
+
+        <!-- Régularisation -->
+        <div data-type-toggle-groupe="regularisation" hidden>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Motif</label>
+            <select class="form-select" name="motif_regularisation" data-type-toggle-champ
+                    data-motif-regularisation="sortie-motif-regul-autre-groupe">
+              <option value="" selected disabled>Sélectionner un motif</option>
+              <option value="Inventaire">Inventaire</option>
+              <option value="Casse/perte">Casse / perte</option>
+              <option value="Erreur de saisie">Erreur de saisie</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+          <div class="mb-3" id="sortie-motif-regul-autre-groupe" hidden>
+            <label class="form-label small fw-semibold">Précisez</label>
+            <input type="text" name="motif_regularisation_autre" class="form-control"
+                   placeholder="ex : erreur d'étiquetage">
+          </div>
         </div>
+
         <button type="submit" class="btn btn-danger w-100 fw-semibold">Enregistrer la sortie</button>
       </form>
     </div>
@@ -63,8 +116,9 @@
       <thead class="text-muted small">
         <tr>
           <th>Date</th>
+          <th>Type</th>
           <th>Article</th>
-          <th>Référence document</th>
+          <th>Référence / Motif</th>
           <th>Quantité</th>
           <th>Saisi par</th>
         </tr>
@@ -73,13 +127,20 @@
         {% for m in mouvements %}
         <tr>
           <td>{{ m.date }}</td>
+          <td>
+            {% if m.sous_type %}
+            <span class="badge bg-{{ m.sous_type_classe }}-subtle text-{{ m.sous_type_classe }}">{{ m.sous_type }}</span>
+            {% else %}
+            —
+            {% endif %}
+          </td>
           <td>{{ m.article }}</td>
-          <td>{{ m.reference }}</td>
+          <td>{{ m.detail }}</td>
           <td>{{ m.quantite }}</td>
           <td>{{ m.saisi_par }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="5" class="text-muted text-center">Aucune sortie enregistrée.</td></tr>
+        <tr><td colspan="6" class="text-muted text-center">Aucune sortie enregistrée.</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -174,11 +174,28 @@ def creer_sortie():
     article_id = request.form.get('article_id', type=int)
     quantite = request.form.get('quantite', type=int)
     date_mouvement = _parser_date_formulaire(request.form.get('date') or '')
-    type_document = (request.form.get('type_document') or '').strip()
-    reference = (request.form.get('reference') or '').strip()
     if quantite is None:
       raise ValueError("Merci d'indiquer une quantité valide.")
-    add_sortie(article_id, date_mouvement, quantite, type_document, reference, utilisateur)
+
+    # Même principe que creer_entree : le formulaire n'affiche que le
+    # bloc de champs pertinent pour le type choisi (voir
+    # templates/pages/sorties.html), résolu ici avant d'appeler
+    # add_sortie, qui reste la seule source de vérité sur ce qui est
+    # obligatoire pour chacun.
+    type_sortie = request.form.get('type_sortie') or ''
+    type_document = reference = motif = None
+    if type_sortie == 'mouvement_sortie':
+      type_document = request.form.get('type_document')
+      reference = request.form.get('reference')
+    elif type_sortie == 'regularisation':
+      motif_categorie = (request.form.get('motif_regularisation') or '').strip()
+      detail = (request.form.get('motif_regularisation_autre') or '').strip()
+      motif = f"Autre : {detail}" if motif_categorie == 'Autre' and detail else motif_categorie
+
+    add_sortie(
+      article_id, date_mouvement, quantite, type_sortie, utilisateur,
+      type_document=type_document, reference=reference, motif=motif,
+    )
   except ValueError as e:
     flash(str(e), 'danger')
     return redirect(url_for('pages_sorties'))

@@ -263,8 +263,23 @@ class Entree(db.Model):
         return TYPES_ENTREE.get(self.type_entree, (self.type_entree, "secondary"))[1]
 
 
+# Libellé + classe Bootstrap affichés pour chaque type de sortie de stock
+# (voir Sortie.type_sortie ci-dessous et apps/gtc_data.py, add_sortie) —
+# même principe que TYPES_ENTREE.
+TYPES_SORTIE = {
+    "mouvement_sortie": ("Mouvement de sortie", "danger"),
+    "regularisation": ("Régularisation", "warning"),
+}
+
+
 class Sortie(db.Model):
-    """Sortie de stock (livraison/consommation)."""
+    """Sortie de stock : mouvement standard (livraison/consommation, avec
+    justificatif), ou régularisation de stock (voir TYPES_SORTIE). Champs
+    utilisés selon le type (voir apps/gtc_data.py, add_sortie) :
+      - Mouvement de sortie : type_document + reference (n° du document) ;
+      - Régularisation : motif (obligatoire — mêmes catégories que pour
+        une régularisation d'entrée, voir TYPES_ENTREE), réservée aux
+        rôles ROLES_REGULARISATION — pas de justificatif classique."""
 
     __tablename__ = "sorties"
 
@@ -272,14 +287,27 @@ class Sortie(db.Model):
     article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
     date = db.Column(db.Date, nullable=False)
     quantite = db.Column(db.Integer, nullable=False)
+    # server_default : les sorties déjà en base avant cette fonctionnalité
+    # étaient toutes des mouvements de sortie standard (la seule sorte qui
+    # existait alors) — la migration les classe donc ainsi.
+    type_sortie = db.Column(db.String(30), nullable=False, server_default="mouvement_sortie")
     type_document = db.Column(db.String(50), nullable=True)
     reference = db.Column(db.String(50), nullable=True)
+    motif = db.Column(db.String(255), nullable=True)
     utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
 
     utilisateur = db.relationship("Utilisateur")
 
     def __repr__(self):
         return f"<Sortie article={self.article_id} -{self.quantite}>"
+
+    @property
+    def type_sortie_libelle(self):
+        return TYPES_SORTIE.get(self.type_sortie, (self.type_sortie, "secondary"))[0]
+
+    @property
+    def type_sortie_classe(self):
+        return TYPES_SORTIE.get(self.type_sortie, (self.type_sortie, "secondary"))[1]
 
 
 class Transfert(db.Model):

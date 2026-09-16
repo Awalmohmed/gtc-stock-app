@@ -5,16 +5,18 @@
   2) tableau des entrées enregistrées (récent -> ancien).
 
   Type d'entrée (voir apps/models.py, TYPES_ENTREE) : le sélecteur en
-  tête de formulaire affiche/masque en JS (extra_js ci-dessous) le bloc
-  de champs pertinent — CHAQUE BLOC A SA PROPRE RECHERCHE D'ARTICLE
-  (includes/article-picker.html), pas un champ partagé : la Réception
-  fournisseur a besoin de scoper la recherche au magasin choisi (voir
-  ci-dessous), ce qui n'a pas de sens pour les deux autres types. Chaque
-  bloc utilise aussi son propre nom de champ pour sa « référence » et
-  son « motif » plutôt que de réutiliser reference/motif pour plusieurs
-  blocs à la fois : plus robuste qu'un show/hide seul (un champ masqué
-  mais pas désactivé serait quand même soumis, y compris un article_id
-  d'un autre bloc).
+  tête de formulaire affiche/masque le bloc de champs pertinent — logique
+  générique (data-type-toggle-*, voir static/assets/js/gtc-stock.js,
+  section 6), partagée avec le formulaire de Sortie (sorties.html), pas
+  de script propre à cette page. CHAQUE BLOC A SA PROPRE RECHERCHE
+  D'ARTICLE (includes/article-picker.html), pas un champ partagé : la
+  Réception fournisseur a besoin de scoper la recherche au magasin
+  choisi (voir ci-dessous), ce qui n'a pas de sens pour les deux autres
+  types. Chaque bloc utilise aussi son propre nom de champ pour sa
+  « référence » et son « motif » plutôt que de réutiliser reference/motif
+  pour plusieurs blocs à la fois : plus robuste qu'un show/hide seul (un
+  champ masqué mais pas désactivé serait quand même soumis, y compris un
+  article_id d'un autre bloc).
 
   Réception fournisseur : en plus du fournisseur, le magasin concerné
   par la réception est libre pour un rôle qui voit tous les magasins
@@ -27,7 +29,9 @@
 
   « Régularisation » n'est proposée qu'à un Administrateur ou un
   Gestionnaire de stock (voir ROLES_REGULARISATION) — la vérification
-  qui compte reste côté serveur (gtc_data.add_entree).
+  qui compte reste côté serveur (gtc_data.add_entree). Le motif de
+  régularisation (liste + « Autre ») suit lui aussi la logique générique
+  (data-motif-regularisation, section 7 de gtc-stock.js).
   Toute validation réelle est côté serveur (gtc_data.add_entree) ; ici
   data-validate = confort.
 #}
@@ -48,7 +52,7 @@
 
         <div class="mb-2">
           <label class="form-label small fw-semibold">Type d'entrée</label>
-          <select class="form-select" name="type_entree" id="entree-type" required>
+          <select class="form-select" name="type_entree" data-type-toggle-select required>
             <option value="reception_fournisseur" selected>Réception fournisseur</option>
             <option value="retour_client">Retour client</option>
             {% if current_user and current_user.role in ['Administrateur', 'Gestionnaire de stock'] %}
@@ -69,10 +73,10 @@
         </div>
 
         <!-- Réception fournisseur -->
-        <div data-type-entree-groupe="reception_fournisseur">
+        <div data-type-toggle-groupe="reception_fournisseur">
           <div class="mb-2">
             <label class="form-label small fw-semibold">Fournisseur</label>
-            <select class="form-select" name="fournisseur_id" data-type-entree-champ required>
+            <select class="form-select" name="fournisseur_id" data-type-toggle-champ required>
               <option value="" selected disabled>Sélectionner un fournisseur</option>
               {% for f in fournisseurs %}
               <option value="{{ f.id }}">{{ f.nom }}</option>
@@ -89,7 +93,7 @@
             <label class="form-label small fw-semibold">Magasin concerné par la réception</label>
             {% if current_user and current_user.role in ['Administrateur', 'Comptable'] %}
             <select class="form-select" name="magasin_id" id="entree-reception-magasin"
-                    data-type-entree-champ required>
+                    data-type-toggle-champ required>
               <option value="" selected disabled>Sélectionner un magasin</option>
               {% for m in magasins %}
               <option value="{{ m.id }}">{{ m.nom }}</option>
@@ -115,32 +119,32 @@
             <div class="col-6 mb-2">
               <label class="form-label small fw-semibold">N° véhicule de livraison</label>
               <input type="text" name="numero_vehicule" class="form-control"
-                     placeholder="ex : AB-123-CD" data-type-entree-champ required>
+                     placeholder="ex : AB-123-CD" data-type-toggle-champ required>
             </div>
             <div class="col-6 mb-2">
               <label class="form-label small fw-semibold">Nom du chauffeur</label>
               <input type="text" name="nom_chauffeur" class="form-control"
-                     placeholder="ex : Jean Dupont" data-type-entree-champ required>
+                     placeholder="ex : Jean Dupont" data-type-toggle-champ required>
             </div>
           </div>
           <div class="row">
             <div class="col-6 mb-3">
               <label class="form-label small fw-semibold">N° bon de livraison fournisseur</label>
               <input type="text" name="num_bon_livraison_fournisseur" class="form-control"
-                     placeholder="ex : BL-2026-0143" data-type-entree-champ required>
+                     placeholder="ex : BL-2026-0143" data-type-toggle-champ required>
               <div class="form-text">Émis par le fournisseur, accompagne la marchandise.</div>
             </div>
             <div class="col-6 mb-3">
               <label class="form-label small fw-semibold">N° bordereau de réception</label>
               <input type="text" name="num_bordereau_reception" class="form-control"
-                     placeholder="ex : BR-2026-0143" data-type-entree-champ required>
+                     placeholder="ex : BR-2026-0143" data-type-toggle-champ required>
               <div class="form-text">Établi en interne à la réception.</div>
             </div>
           </div>
         </div>
 
         <!-- Retour client -->
-        <div data-type-entree-groupe="retour_client" hidden>
+        <div data-type-toggle-groupe="retour_client" hidden>
           <div class="mb-2">
             <label class="form-label small fw-semibold">Article</label>
             {% set article_picker_id = 'entree-article-retour' %}
@@ -150,7 +154,7 @@
           <div class="mb-2">
             <label class="form-label small fw-semibold">Nom ou référence du client</label>
             <input type="text" name="reference_client" class="form-control"
-                   placeholder="ex : Sté Dupont / CLI-0042" data-type-entree-champ>
+                   placeholder="ex : Sté Dupont / CLI-0042" data-type-toggle-champ>
           </div>
           <div class="mb-3">
             <label class="form-label small fw-semibold">Motif du retour (optionnel)</label>
@@ -159,7 +163,7 @@
         </div>
 
         <!-- Régularisation -->
-        <div data-type-entree-groupe="regularisation" hidden>
+        <div data-type-toggle-groupe="regularisation" hidden>
           <div class="mb-2">
             <label class="form-label small fw-semibold">Article</label>
             {% set article_picker_id = 'entree-article-regularisation' %}
@@ -168,7 +172,8 @@
           </div>
           <div class="mb-2">
             <label class="form-label small fw-semibold">Motif</label>
-            <select class="form-select" name="motif_regularisation" id="entree-motif-regul" data-type-entree-champ>
+            <select class="form-select" name="motif_regularisation" data-type-toggle-champ
+                    data-motif-regularisation="entree-motif-regul-autre-groupe">
               <option value="" selected disabled>Sélectionner un motif</option>
               <option value="Inventaire">Inventaire</option>
               <option value="Casse/perte">Casse / perte</option>
@@ -209,8 +214,8 @@
         <tr>
           <td>{{ m.date }}</td>
           <td>
-            {% if m.type_entree %}
-            <span class="badge bg-{{ m.type_entree_classe }}-subtle text-{{ m.type_entree_classe }}">{{ m.type_entree }}</span>
+            {% if m.sous_type %}
+            <span class="badge bg-{{ m.sous_type_classe }}-subtle text-{{ m.sous_type_classe }}">{{ m.sous_type }}</span>
             {% else %}
             —
             {% endif %}
@@ -229,61 +234,3 @@
 </div>
 
 {% endblock content %}
-
-{% block extra_js %}
-<script>
-  // Affiche/masque le bloc de champs pertinent selon le type d'entrée
-  // choisi (voir apps/models.py, TYPES_ENTREE). Désactiver (pas
-  // seulement masquer) les champs du bloc inactif évite qu'ils soient
-  // quand même soumis (y compris le champ caché article_id de chaque
-  // recherche d'article — voir data-article-picker-value, un par bloc
-  // puisque chacun a sa propre recherche d'article), et retirer leur
-  // `required` évite qu'ils bloquent la validation native du navigateur
-  // alors qu'ils sont invisibles.
-  (function () {
-    var selectType = document.getElementById('entree-type');
-    var groupes = document.querySelectorAll('[data-type-entree-groupe]');
-    if (!selectType || !groupes.length) return;
-
-    function majGroupes() {
-      var type = selectType.value;
-      groupes.forEach(function (groupe) {
-        var actif = groupe.getAttribute('data-type-entree-groupe') === type;
-        groupe.hidden = !actif;
-        groupe.querySelectorAll('[data-type-entree-champ]').forEach(function (champ) {
-          champ.disabled = !actif;
-          if (actif) champ.setAttribute('required', 'required');
-          else champ.removeAttribute('required');
-        });
-        // Recherche d'article de ce bloc (voir includes/article-picker.html) :
-        // le champ caché article_id (jamais `required`, mais désactivé
-        // quand son bloc est inactif — sinon plusieurs champs "article_id",
-        // un par bloc, seraient soumis à la fois) ET le champ texte visible
-        // (lui EST `required` par défaut — le désactiver aussi est
-        // indispensable, sinon la validation native du formulaire le
-        // bloque à cause d'un champ requis resté invisible mais actif).
-        groupe.querySelectorAll('[data-article-picker-value], [data-article-picker-input]').forEach(function (champ) {
-          champ.disabled = !actif;
-        });
-      });
-    }
-    selectType.addEventListener('change', majGroupes);
-    majGroupes();
-
-    // Régularisation : le champ libre "Précisez" n'apparaît que pour le
-    // motif "Autre".
-    var selectMotifRegul = document.getElementById('entree-motif-regul');
-    var groupeAutre = document.getElementById('entree-motif-regul-autre-groupe');
-    if (!selectMotifRegul || !groupeAutre) return;
-    var champAutre = groupeAutre.querySelector('input');
-
-    function majAutre() {
-      var affiche = selectMotifRegul.value === 'Autre';
-      groupeAutre.hidden = !affiche;
-      if (champAutre) champAutre.disabled = !affiche;
-    }
-    selectMotifRegul.addEventListener('change', majAutre);
-    majAutre();
-  })();
-</script>
-{% endblock extra_js %}

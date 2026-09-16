@@ -19,7 +19,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from apps import db
 from apps.models import (
     Utilisateur, Article, Entree, Sortie, Transfert, Fournisseur, JournalActivite,
-    Magasin, Alerte, ROLE_CLASSES, ROLES_TOUS_MAGASINS, TYPES_ENTREE, ROLES_REGULARISATION,
+    Magasin, Alerte, ROLE_CLASSES, ROLES_TOUS_MAGASINS, TYPES_ENTREE, TYPES_SORTIE,
+    ROLES_REGULARISATION,
 )
 from apps import sage_connector
 from apps import mailer
@@ -464,9 +465,13 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
     """Formate une ligne Entree/Sortie pour l'affichage (gabarit commun
     aux pages entrées/sorties et fiche de stock).
 
-    `detail` complète `reference` pour une Entree sans référence externe
-    (une régularisation n'a pas de bordereau) : on retombe alors sur son
-    motif, pour ne jamais afficher une ligne vide de tout contexte."""
+    `sous_type`/`sous_type_classe` (libellé + classe Bootstrap du badge —
+    voir TYPES_ENTREE / TYPES_SORTIE) sont communs aux deux : une entrée
+    et une sortie ont chacune leur propre sous-classification, affichée
+    de la même façon. `detail` complète `reference` quand elle est vide
+    (une régularisation n'a ni bordereau ni n° de document) : on retombe
+    alors sur le motif, pour ne jamais afficher une ligne vide de tout
+    contexte."""
     ligne = {
         "date": mouvement.date.strftime("%d/%m/%Y"),
         "date_tri": mouvement.date,
@@ -479,12 +484,14 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
         "quantite_brute": mouvement.quantite,
         "saisi_par": mouvement.utilisateur.nom if mouvement.utilisateur else "—",
     }
-    # type_entree n'existe que sur Entree (voir apps/models.py) — absent
-    # pour une Sortie, d'où le getattr plutôt qu'un accès direct.
+    # type_entree/type_sortie n'existent que sur Entree, respectivement
+    # Sortie (voir apps/models.py) — jamais les deux sur le même objet,
+    # d'où le getattr plutôt qu'un accès direct.
     type_entree = getattr(mouvement, "type_entree", None)
+    type_sortie = getattr(mouvement, "type_sortie", None)
     if type_entree == "reception_fournisseur":
-        ligne["type_entree"] = mouvement.type_entree_libelle
-        ligne["type_entree_classe"] = mouvement.type_entree_classe
+        ligne["sous_type"] = mouvement.type_entree_libelle
+        ligne["sous_type_classe"] = mouvement.type_entree_classe
         ligne["detail"] = mouvement.num_bon_livraison_fournisseur or "—"
         # Affichés en plus du détail sur la fiche de stock seulement (voir
         # templates/pages/fiche_stock.html) — None ailleurs n'est jamais lu.
@@ -492,8 +499,12 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
         ligne["nom_chauffeur"] = mouvement.nom_chauffeur
         ligne["num_bordereau_reception"] = mouvement.num_bordereau_reception
     elif type_entree:
-        ligne["type_entree"] = mouvement.type_entree_libelle
-        ligne["type_entree_classe"] = mouvement.type_entree_classe
+        ligne["sous_type"] = mouvement.type_entree_libelle
+        ligne["sous_type_classe"] = mouvement.type_entree_classe
+        ligne["detail"] = mouvement.reference or mouvement.motif or "—"
+    elif type_sortie:
+        ligne["sous_type"] = mouvement.type_sortie_libelle
+        ligne["sous_type_classe"] = mouvement.type_sortie_classe
         ligne["detail"] = mouvement.reference or mouvement.motif or "—"
     else:
         ligne["detail"] = ligne["reference"]
@@ -858,11 +869,23 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *
     return entree
 
 
-def add_sortie(article_id, date_mouvement, quantite, type_document, reference, utilisateur):
-    """Enregistre une sortie de stock et met à jour l'article. Lève
-    ValueError si l'article est introuvable, la quantité invalide, ou
-    si le stock disponible est insuffisant (le stock ne peut jamais
-    devenir négatif)."""
+def add_sortie(article_id, date_mouvement, quantite, type_sortie, utilisateur, *,
+                type_document=None, reference=None, motif=None):
+    """Enregistre une sortie de stock et met à jour l'article. `type_sortie`
+    (voir TYPES_SORTIE) détermine quels champs — tous passés en mots-clés —
+    sont réellement utilisés :
+      - "mouvement_sortie" : type_document ET reference (n° du document)
+        obligatoires — comportement standard, inchangé ;
+      - "regularisation" : motif obligatoire (mêmes catégories que pour
+        une régularisation d'entrée), réservée aux rôles
+        ROLES_REGULARISATION (Administrateur / Gestionnaire de stock) —
+        pas de justificatif classique.
+
+    Lève ValueError si l'article est introuvable, si `type_sortie` est
+    invalide, si un champ obligatoire pour ce type manque, si le rôle de
+    `utilisateur` n'autorise pas une régularisation, si la quantité est
+    invalide, ou si le stock disponible est insuffisant (le stock ne peut
+    jamais devenir négatif, quel que soit le type)."""
     article = _article_mouvementable(article_id)
     if quantite <= 0:
         raise ValueError("La quantité doit être supérieure à zéro.")
@@ -871,10 +894,33 @@ def add_sortie(article_id, date_mouvement, quantite, type_document, reference, u
             f"Stock insuffisant : {article.quantite} disponible(s) pour "
             f"« {article.nom} », {quantite} demandé(s)."
         )
+    if type_sortie not in TYPES_SORTIE:
+        raise ValueError("Type de sortie invalide.")
+
+    type_document = (type_document or "").strip() or None
+    reference = (reference or "").strip() or None
+    motif = (motif or "").strip() or None
+
+    if type_sortie == "mouvement_sortie":
+        if not type_document:
+            raise ValueError("Merci de sélectionner un type de document.")
+        if not reference:
+            raise ValueError("Merci d'indiquer le n° du document.")
+        motif = None
+    elif type_sortie == "regularisation":
+        if utilisateur is None or utilisateur.role not in ROLES_REGULARISATION:
+            raise ValueError(
+                "Seuls un Administrateur ou un Gestionnaire de stock peuvent "
+                "enregistrer une régularisation."
+            )
+        if not motif:
+            raise ValueError("Merci d'indiquer le motif de la régularisation.")
+        type_document = None
+        reference = None  # pas de document externe pour une régularisation
 
     sortie = Sortie(
         article_id=article.id, date=date_mouvement, quantite=quantite,
-        type_document=type_document or None, reference=reference or None,
+        type_sortie=type_sortie, type_document=type_document, reference=reference, motif=motif,
         utilisateur_id=utilisateur.id if utilisateur else None,
     )
     statut_avant = article.statut
@@ -888,8 +934,11 @@ def add_sortie(article_id, date_mouvement, quantite, type_document, reference, u
     bascule_en_alerte = statut_avant != "Alerte" and article.statut == "Alerte"
 
     db.session.add(sortie)
-    _journaliser(utilisateur, "sortie_stock",
-                 f"Sortie de {quantite} sur « {article.nom} » ({article.reference}).")
+    _journaliser(
+        utilisateur, "sortie_stock",
+        f"Sortie de {quantite} sur « {article.nom} » ({article.reference}) "
+        f"— {sortie.type_sortie_libelle}.",
+    )
     db.session.commit()
 
     if bascule_en_alerte:

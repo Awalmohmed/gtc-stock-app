@@ -220,4 +220,62 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
+  // ---- 6. Bascule de blocs de champs selon un type choisi ----
+  // Générique : affiche/masque le bloc de champs pertinent selon la
+  // valeur d'un <select> — utilisé par « Type d'entrée » (entrees.html)
+  // et « Type de sortie » (sorties.html), sur le même principe. Marquage
+  // attendu (dans le même <form> que le sélecteur) :
+  //   <select data-type-toggle-select> ... </select>
+  //   <div data-type-toggle-groupe="valeur-de-option">
+  //     <input data-type-toggle-champ required> <!-- rendu obligatoire
+  //       seulement quand ce bloc est actif -->
+  //   </div>
+  // Désactiver (pas seulement masquer) les champs du bloc inactif évite
+  // qu'ils soient quand même soumis, et retirer leur `required` évite
+  // qu'ils bloquent la validation native du formulaire alors qu'ils sont
+  // invisibles. Un champ de recherche d'article (voir section 5) présent
+  // dans un bloc suit la même règle : son champ caché (article_id) et
+  // son champ texte visible (`required` par défaut) sont eux aussi
+  // désactivés avec le reste du bloc inactif.
+  document.querySelectorAll("[data-type-toggle-select]").forEach(function (select) {
+    var form = select.closest("form") || document;
+    var groupes = form.querySelectorAll("[data-type-toggle-groupe]");
+    if (!groupes.length) return;
+
+    function majGroupes() {
+      var valeur = select.value;
+      groupes.forEach(function (groupe) {
+        var actif = groupe.getAttribute("data-type-toggle-groupe") === valeur;
+        groupe.hidden = !actif;
+        groupe.querySelectorAll("[data-type-toggle-champ]").forEach(function (champ) {
+          champ.disabled = !actif;
+          if (actif) champ.setAttribute("required", "required");
+          else champ.removeAttribute("required");
+        });
+        groupe.querySelectorAll("[data-article-picker-value], [data-article-picker-input]").forEach(function (champ) {
+          champ.disabled = !actif;
+        });
+      });
+    }
+    select.addEventListener("change", majGroupes);
+    majGroupes();
+  });
+
+  // ---- 7. Motif de régularisation : champ libre "Précisez" pour "Autre" ----
+  // Générique elle aussi (entrees.html et sorties.html) : le <select> du
+  // motif porte data-motif-regularisation="id-du-bloc-a-afficher".
+  document.querySelectorAll("[data-motif-regularisation]").forEach(function (select) {
+    var groupeAutre = document.getElementById(select.getAttribute("data-motif-regularisation"));
+    if (!groupeAutre) return;
+    var champAutre = groupeAutre.querySelector("input");
+
+    function majAutre() {
+      var affiche = select.value === "Autre";
+      groupeAutre.hidden = !affiche;
+      if (champAutre) champAutre.disabled = !affiche;
+    }
+    select.addEventListener("change", majAutre);
+    majAutre();
+  });
+
 });
