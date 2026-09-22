@@ -1,7 +1,16 @@
 <!--
-  GTC Stock — Layout pages d'authentification (écran fractionné navy)
+  GTC Stock — Layout des pages d'AUTHENTIFICATION (écran fractionné navy).
   Design porté depuis la maquette statique gtc_stock_pro/.
+
+  Minimal : le head (mêmes assets locaux que gtc-base) + <body class="auth-body">
+  dont le seul contenu est le bloc `content` (les pages sign-in / sign-up
+  dessinent elles-mêmes l'illustration à gauche et le formulaire à droite).
+  Blocs surchargeables : title, content, extrastyle, extra_js.
 -->
+{#
+  Nota : `layouts/base.html` (Volt) est un autre layout, non utilisé ici —
+  voir DOCS/PARCOURS_DU_CODE.md §7.4.
+#}
 <!DOCTYPE html>
 <html lang="fr">
 <head>

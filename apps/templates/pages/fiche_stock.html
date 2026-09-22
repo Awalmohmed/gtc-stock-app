@@ -1,3 +1,13 @@
+{#
+  Fiches de stock — route pages_fiche_stock (GET /pages/fiche-stock/?article=<id>),
+  tout rôle connecté. Reçoit : articles, article (celui ciblé ou le 1er),
+  historique (get_historique, avec solde après chaque mouvement), fournisseurs, magasins.
+  Sections : 1) liste d'articles à gauche ; 2) fiche détaillée à droite
+  (3 compteurs + historique + exports PDF/Excel) ; 3) modale « Nouvel article »
+  -> POST creer_article. Le champ « Magasin de rattachement » n'apparaît que
+  pour un Administrateur ; un Gestionnaire crée dans son propre magasin.
+  peut_gerer = raccourci de rôle pour afficher/masquer les actions d'édition.
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Fiches de stock{% endblock title %}
@@ -7,7 +17,7 @@
 
 {% block content %}
 
-<div class="d-flex justify-content-end gap-2 mb-3">
+<div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
   {% if peut_gerer %}
   <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNouvelArticle">
     <i class="bi bi-plus-lg"></i> Nouvel article
@@ -43,7 +53,7 @@
   <div class="col-md-8">
     {% if article %}
     <div class="card table-card p-4">
-      <div class="d-flex justify-content-between align-items-start mb-3">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
         <div>
           <h5 class="mb-0">{{ article.nom }}</h5>
           <span class="text-muted small">Référence : {{ article.reference }}</span>
@@ -159,7 +169,7 @@
           <div class="mb-3">
             <label class="form-label small fw-semibold" for="art-nom">Désignation</label>
             <input type="text" id="art-nom" name="nom" class="form-control" maxlength="150"
-                   placeholder="ex : Rame de papier A4" required>
+                   placeholder="ex : riz sana ind" required>
           </div>
           <div class="row">
             <div class="col-sm-6 mb-3">

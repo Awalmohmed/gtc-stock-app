@@ -11,6 +11,9 @@ __pycache__/
 *.sqlite3
 *.log
 
+# secrets locaux (SMTP, SECRET_KEY, ...) — jamais commités
+.env
+
 # venv
 env
 venv

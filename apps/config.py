@@ -5,6 +5,18 @@ Copyright (c) 2019 - present AppSeed.us
 
 import os
 
+from dotenv import load_dotenv
+
+# Charge les variables d'environnement depuis le fichier .env à la racine du
+# projet, s'il existe (chemin explicite plutôt qu'une recherche relative au
+# répertoire de travail courant, pour que ça marche pareil qu'on lance
+# `python run.py` depuis la racine ou via gunicorn/un service). N'écrase
+# jamais une variable déjà présente dans l'environnement réel (override=False
+# par défaut) : en production (ex. Render), les vraies variables d'env
+# restent prioritaires sur un éventuel .env embarqué par erreur.
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+
+
 class Config(object):
 
     basedir = os.path.abspath(os.path.dirname(__file__))

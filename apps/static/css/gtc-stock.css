@@ -19,6 +19,7 @@ body {
 
 /* ---------- Layout tableau de bord ---------- */
 .sidebar {
+  width: 230px;
   min-height: 100vh;
   background: var(--gtc-navy);
 }
@@ -43,6 +44,72 @@ body {
 .topbar {
   background: #fff;
   border-bottom: 1px solid #eee;
+}
+/* La colonne principale (sidebar + elle = .d-flex parent) doit pouvoir
+   rétrécir sous la largeur de son contenu — sinon un enfant un peu
+   large (ex. la topbar) force toute la page à s'élargir et un
+   défilement horizontal apparaît sur TOUTE la page, pas seulement sur
+   les tableaux (voir table-responsive plus bas). Comportement par
+   défaut d'un enfant flex (min-width:auto) sans cette règle. */
+.main-col {
+  min-width: 0;
+}
+
+/* ---------- Sidebar en menu masqué (mobile/tablette) ----------
+   En dessous de lg (992px, tablette portrait comprise), la sidebar
+   quitte le flux normal et devient un panneau qui glisse depuis la
+   gauche (position: fixed + transform), ouvert via le bouton ☰ de la
+   topbar (voir includes/gtc-sidebar.html et assets/js/gtc-stock.js,
+   section 8). Un fond assombri (.sidebar-backdrop) couvre le reste de
+   la page pendant que le menu est ouvert, pour le fermer d'un tap
+   n'importe où ailleurs — comportement standard d'un menu mobile. */
+@media (max-width: 991.98px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1045;
+    transform: translateX(-100%);
+    transition: transform .25s ease-in-out;
+    overflow-y: auto;
+  }
+  .sidebar.show {
+    transform: translateX(0);
+  }
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    z-index: 1040;
+  }
+  .sidebar-backdrop.show {
+    display: block;
+  }
+}
+
+/* ---------- Cibles tactiles (mobile/tablette) ----------
+   En dessous de lg, on suppose une utilisation majoritairement au
+   doigt : boutons et liens de navigation reçoivent un peu plus de
+   hauteur (recommandation usuelle : ~44px) pour rester faciles à
+   toucher sans zoomer, sans changer leur taille sur poste de bureau. */
+@media (max-width: 991.98px) {
+  .btn {
+    padding-top: .55rem;
+    padding-bottom: .55rem;
+  }
+  .btn-sm {
+    padding-top: .5rem;
+    padding-bottom: .5rem;
+  }
+  .sidebar .nav-link {
+    padding: .85rem 1rem;
+  }
+  .list-group-item-action {
+    padding-top: .85rem;
+    padding-bottom: .85rem;
+  }
 }
 
 /* ---------- Cartes ---------- */

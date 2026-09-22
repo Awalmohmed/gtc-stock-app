@@ -1,3 +1,13 @@
+{#
+  Connexion — route accounts_sign_in (GET/POST /accounts/sign-in/), page publique.
+  Reçoit : stats (pour l'illustration de gauche). POST -> vérifie les
+  identifiants (rate-limité par login ET par IP, voir rate_limit.py) ; en cas
+  de succès la session est créée et l'utilisateur est redirigé vers ?next=
+  (validé par is_safe_next_url) ou le dashboard.
+  Sections : illustration à gauche ; formulaire à droite (identifiant, mot de
+  passe avec bouton afficher/masquer, « Se souvenir de moi », lien mot de passe
+  oublié). Champ caché « next » propagé si présent. data-validate = confort client.
+#}
 {% extends 'layouts/gtc-auth.html' %}
 
 {% block title %}GTC Stock - Connexion{% endblock title %}

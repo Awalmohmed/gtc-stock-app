@@ -1,3 +1,9 @@
+{#
+  Rend les messages flash (flash(msg, categorie) dans views.py) en alertes
+  Bootstrap « dismissible ». La catégorie sert de suffixe de classe
+  (success / danger / warning / info) ; 'error' est ramené à 'danger'.
+  Inclus par layouts/gtc-base.html et par les pages d'auth.
+#}
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}

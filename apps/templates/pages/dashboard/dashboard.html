@@ -1,3 +1,10 @@
+{#
+  Tableau de bord — route pages_dashboard (GET /pages/dashboard/), tout rôle connecté.
+  Reçoit : stats (get_stats) et articles (get_all_articles), déjà filtrés au magasin courant.
+  Sections : 1) 4 cartes de synthèse ; 2) tableau « aperçu des articles » avec
+  badge de rapprochement Sage 100 (Écart / Conforme). Bouton « Nouvel article »
+  visible seulement pour Gestionnaire de stock / Administrateur.
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Tableau de bord{% endblock title %}
@@ -7,7 +14,7 @@
 
 <!-- Cartes statistiques -->
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
+  <div class="col-12 col-sm-6 col-lg-3">
     <div class="card card-stat p-3">
       <div class="d-flex justify-content-between">
         <div>
@@ -18,7 +25,7 @@
       </div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-12 col-sm-6 col-lg-3">
     <div class="card card-stat p-3">
       <div class="d-flex justify-content-between">
         <div>
@@ -29,7 +36,7 @@
       </div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-12 col-sm-6 col-lg-3">
     <div class="card card-stat p-3">
       <div class="d-flex justify-content-between">
         <div>
@@ -40,7 +47,7 @@
       </div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-12 col-sm-6 col-lg-3">
     <div class="card card-stat p-3">
       <div class="d-flex justify-content-between">
         <div>
@@ -55,7 +62,7 @@
 
 <!-- Table -->
 <div class="card table-card p-3">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <h6 class="mb-0">Fiche de stock — Aperçu des articles</h6>
     {% if current_user and current_user.role in ['Gestionnaire de stock', 'Administrateur'] %}
     <a href="{{ url_for('pages_fiche_stock') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Nouvel article</a>

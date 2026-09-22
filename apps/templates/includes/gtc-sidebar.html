@@ -4,9 +4,20 @@
   passée par chaque route (ex. segment='articles'). Les entrées « Magasins »
   et « Journal d'activité » ne sont rendues que pour un Administrateur ;
   « Transferts » pour un Gestionnaire de stock ou un Administrateur.
+
+  En dessous de lg (992px), ce panneau est masqué par défaut (voir
+  gtc-stock.css) et s'ouvre via le bouton ☰ de la topbar — le bouton de
+  fermeture ci-dessous (visible seulement sur ce même intervalle,
+  d-lg-none) offre un second moyen de le refermer, en plus du fond
+  assombri cliquable (#sidebarBackdrop, gtc-base.html) et de la touche
+  Échap (assets/js/gtc-stock.js, section 8).
 #}
-<div class="sidebar p-3" style="width:230px;">
-  <div class="brand"><i class="bi bi-box-seam"></i> GTC Stock</div>
+<div class="sidebar p-3" id="sidebarNav">
+  <div class="d-flex align-items-center justify-content-between">
+    <div class="brand mb-0"><i class="bi bi-box-seam"></i> GTC Stock</div>
+    <button type="button" class="btn-close btn-close-white d-lg-none" id="sidebarClose"
+            aria-label="Fermer le menu"></button>
+  </div>
   <nav class="nav flex-column mt-3">
     <a class="nav-link {% if 'dashboard' in segment %}active{% endif %}" href="{{ url_for('pages_dashboard') }}">
       <i class="bi bi-grid-1x2 me-2"></i> Tableau de bord

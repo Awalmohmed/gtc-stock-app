@@ -1,3 +1,14 @@
+{#
+  Rapprochement comptable — route pages_rapprochement (GET /pages/rapprochement/),
+  tout rôle connecté. Reçoit (get_rapprochement) : rapprochement (les lignes),
+  sage_connecte (bool), erreur_sage (message ou None).
+  Sections : 1) carte « Connexion Sage 100 » — badge Connecté / Non connecté et,
+  le cas échéant, l'erreur de connexion affichée sans la masquer ;
+  2) tableau du dernier rapprochement (lignes non conformes en table-danger) +
+  boutons export -> export_rapprochement_pdf / export_rapprochement_excel.
+  Quand Sage n'est pas configuré/joignable, les lignes viennent des données de
+  démonstration (RAPPROCHEMENT dans gtc_data.py).
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Rapprochement{% endblock title %}
@@ -32,7 +43,7 @@
 </div>
 
 <div class="card table-card p-3">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <h6 class="mb-0">Résultat du dernier rapprochement</h6>
     <div class="btn-group btn-group-sm">
       <a href="{{ url_for('export_rapprochement_pdf') }}" class="btn btn-outline-secondary">

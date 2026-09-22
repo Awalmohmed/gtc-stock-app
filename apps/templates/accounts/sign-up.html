@@ -1,3 +1,13 @@
+{#
+  Créer un compte — route accounts_sign_up (GET/POST /accounts/sign-up/),
+  ADMINISTRATEUR seulement (@admin_required) : il n'y a PAS d'auto-inscription publique.
+  Reçoit : magasins (pour le rôle Gestionnaire de stock).
+  Formulaire : nom, prénom, identifiant, rôle, magasin de rattachement,
+  mot de passe + confirmation. POST -> add_user (via la route, qui valide tout :
+  champs requis, rôle connu, magasin requis pour un Gestionnaire, mot de passe
+  >= 8 et confirmé, identifiant libre). Bloc extra_js : masque le champ magasin
+  sauf pour un Gestionnaire de stock. La validation serveur fait foi.
+#}
 {% extends 'layouts/gtc-auth.html' %}
 
 {% block title %}GTC Stock - Créer un compte{% endblock title %}
@@ -26,11 +36,11 @@
     <form action="{{ url_for('accounts_sign_up') }}" method="post" data-validate novalidate autocomplete="on">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="row">
-        <div class="col-6 mb-3">
+        <div class="col-12 col-sm-6 mb-3">
           <label class="form-label small fw-semibold" for="reg-nom">Nom</label>
           <input type="text" id="reg-nom" name="nom" class="form-control" placeholder="Nom" autocomplete="family-name" required>
         </div>
-        <div class="col-6 mb-3">
+        <div class="col-12 col-sm-6 mb-3">
           <label class="form-label small fw-semibold" for="reg-prenom">Prénom</label>
           <input type="text" id="reg-prenom" name="prenom" class="form-control" placeholder="Prénom" autocomplete="given-name" required>
         </div>
@@ -70,14 +80,14 @@
       </div>
 
       <div class="row">
-        <div class="col-6 mb-1">
+        <div class="col-12 col-sm-6 mb-1">
           <label class="form-label small fw-semibold" for="reg-pwd">Mot de passe</label>
           <input type="password" id="reg-pwd" name="mot_de_passe" class="form-control"
                  placeholder="••••••••" autocomplete="new-password" minlength="8"
                  data-pwd-original data-pwd-strength required>
           <div class="pwd-strength"><div class="pwd-strength-bar"></div></div>
         </div>
-        <div class="col-6 mb-1">
+        <div class="col-12 col-sm-6 mb-1">
           <label class="form-label small fw-semibold" for="reg-pwd-confirm">Confirmation</label>
           <input type="password" id="reg-pwd-confirm" name="mot_de_passe_confirmation" class="form-control"
                  placeholder="••••••••" autocomplete="new-password" minlength="8"

@@ -1,3 +1,9 @@
+{#
+  Fournisseurs — route pages_fournisseurs (GET /pages/fournisseurs/), tout rôle connecté.
+  Reçoit : fournisseurs (get_all_fournisseurs, triés par nom).
+  Sections : 1) tableau (nom, contact) ; 2) formulaire d'ajout -> POST creer_fournisseur
+  (nom unique, contrôlé côté serveur). Pas d'édition/suppression pour l'instant.
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Fournisseurs{% endblock title %}

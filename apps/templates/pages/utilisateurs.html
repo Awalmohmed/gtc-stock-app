@@ -1,3 +1,15 @@
+{#
+  Gestion des utilisateurs — route pages_utilisateurs (GET /pages/utilisateurs/),
+  tout rôle connecté (lecture) ; toutes les actions sont réservées à l'Administrateur.
+  Reçoit : utilisateurs (get_all_users), magasins.
+  Sections : 1) tableau des comptes ; 2) par utilisateur, modales
+  « Modifier » (POST modifier_utilisateur) et « Réinitialiser le mot de passe »
+  (POST reinit_mot_de_passe_utilisateur) ; le bouton activer/désactiver poste
+  vers statut_utilisateur. Garde-fous repris ici visuellement : sur SON PROPRE
+  compte, l'admin ne peut ni changer de rôle ni se désactiver (champs disabled
+  + <input hidden> de repli) — la règle fait foi côté serveur (gtc_data).
+  Bloc extra_js : masque le champ « Magasin » sauf pour un Gestionnaire de stock.
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Utilisateurs{% endblock title %}
@@ -8,7 +20,7 @@
 {% block content %}
 
 <div class="card table-card p-3">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <h6 class="mb-0">Comptes utilisateurs</h6>
     {% if est_admin %}
     <a href="{{ url_for('accounts_sign_up') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Ajouter un utilisateur</a>

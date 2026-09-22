@@ -1,7 +1,22 @@
 <!--
-  GTC Stock — Layout tableau de bord (sidebar navy + topbar)
+  GTC Stock — Layout des pages CONNECTÉES (sidebar navy + topbar).
   Design porté depuis la maquette statique gtc_stock_pro/.
+
+  Structure : le head (Bootstrap + Bootstrap Icons + gtc-stock.css, tous en
+  local) puis sidebar (includes/gtc-sidebar.html) + colonne principale
+  = topbar (sélecteur de magasin visible seulement si `magasins_selecteur`
+  est injecté, c.-à-d. rôles « tous magasins » — voir views.injecter_selecteur_magasin ;
+  bloc utilisateur / déconnexion) + flash-messages + le bloc `content`.
+
+  Blocs surchargeables par les pages : title, page_title, content, extrastyle, extra_js.
+  Chaque <form> de mutation doit inclure {{ csrf_token() }} (CSRFProtect global).
 -->
+{#
+  Nota : les gabarits `layouts/base.html` + `includes/head.html`, `nav.html`,
+  `navigation.html`, `sidebar.html`, `scripts.html`, `footer.html` proviennent
+  du starter Volt et ne sont PAS utilisés par les pages métier — voir
+  DOCS/PARCOURS_DU_CODE.md §7.4.
+#}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -21,11 +36,26 @@
 <div class="d-flex">
 
   {% include 'includes/gtc-sidebar.html' %}
+  <!-- Fond assombri derrière la sidebar ouverte en mobile/tablette
+       (< 992px, voir gtc-stock.css) ; cliquer dessus la referme (section
+       8 de assets/js/gtc-stock.js). Invisible et hors du flux tant que
+       la sidebar est fermée. -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-  <div class="flex-grow-1">
-    <div class="topbar d-flex justify-content-between align-items-center px-4 py-3">
-      <h5 class="mb-0">{% block page_title %}Tableau de bord{% endblock page_title %}</h5>
+  <div class="flex-grow-1 main-col">
+    <div class="topbar d-flex justify-content-between align-items-center flex-wrap gap-2 px-4 py-3">
       <div class="d-flex align-items-center gap-2">
+        <!-- Bouton ☰ : n'existe visuellement qu'en dessous de lg (992px),
+             la sidebar restant toujours affichée au-dessus (voir
+             gtc-stock.css). aria-expanded/aria-controls tenus à jour par
+             le script (section 8 de gtc-stock.js). -->
+        <button type="button" class="btn btn-outline-secondary d-lg-none" id="sidebarToggle"
+                aria-label="Ouvrir le menu" aria-controls="sidebarNav" aria-expanded="false">
+          <i class="bi bi-list"></i>
+        </button>
+        <h5 class="mb-0">{% block page_title %}Tableau de bord{% endblock page_title %}</h5>
+      </div>
+      <div class="d-flex align-items-center flex-wrap gap-2">
         {% if magasins_selecteur %}
         <form method="post" action="{{ url_for('definir_magasin_filtre') }}" class="d-flex align-items-center me-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -41,14 +71,18 @@
         </form>
         {% endif %}
         {% if current_user %}
-        <span class="text-muted small">{{ current_user.nom }} — {{ current_user.role }}</span>
-        <div class="bg-secondary rounded-circle" style="width:36px;height:36px;"></div>
-        <a href="{{ url_for('accounts_logout') }}" class="btn btn-sm btn-outline-secondary ms-2">
-          <i class="bi bi-box-arrow-right"></i> Déconnexion
+        <!-- Nom/rôle masqué sous md (768px) : l'avatar reste comme repère
+             d'identité, le texte revient dès qu'il y a la place. -->
+        <span class="text-muted small d-none d-md-inline">{{ current_user.nom }} — {{ current_user.role }}</span>
+        <div class="bg-secondary rounded-circle flex-shrink-0" style="width:36px;height:36px;"></div>
+        <a href="{{ url_for('accounts_logout') }}" class="btn btn-sm btn-outline-secondary ms-2"
+           aria-label="Déconnexion">
+          <i class="bi bi-box-arrow-right"></i> <span class="d-none d-md-inline">Déconnexion</span>
         </a>
         {% else %}
-        <a href="{{ url_for('accounts_sign_in') }}" class="btn btn-sm btn-outline-secondary ms-2">
-          <i class="bi bi-box-arrow-in-right"></i> Connexion
+        <a href="{{ url_for('accounts_sign_in') }}" class="btn btn-sm btn-outline-secondary ms-2"
+           aria-label="Connexion">
+          <i class="bi bi-box-arrow-in-right"></i> <span class="d-none d-md-inline">Connexion</span>
         </a>
         {% endif %}
       </div>

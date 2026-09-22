@@ -1,3 +1,13 @@
+{#
+  Gestion des magasins — route pages_magasins (GET /pages/magasins/), ADMINISTRATEUR
+  seulement (@admin_required). Reçoit : magasins = get_magasins_detailles()
+  -> liste de {magasin, nb_articles, nb_gestionnaires}.
+  Sections : 1) tableau des magasins avec édition inline de l'e-mail d'alerte
+  (POST maj_email_magasin) ; 2) formulaire d'ajout (POST creer_magasin) ;
+  3) modale de modification par magasin (POST modifier_magasin).
+  L'e-mail d'alerte = destinataire des alertes de seuil des articles du magasin
+  (voir mailer.py) ; vide -> alerte seulement journalisée.
+#}
 {% extends 'layouts/gtc-base.html' %}
 
 {% block title %}GTC Stock - Magasins{% endblock title %}

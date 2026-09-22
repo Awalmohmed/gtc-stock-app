@@ -278,4 +278,35 @@ document.addEventListener("DOMContentLoaded", function () {
     majAutre();
   });
 
+  // ---- 8. Sidebar en menu masqué (mobile/tablette) ----
+  // En dessous de lg (992px), la sidebar est masquée par défaut (voir
+  // gtc-stock.css) : le bouton ☰ de la topbar, le fond assombri et la
+  // touche Échap la font glisser en vue / la referment. Au-dessus de lg
+  // elle reste toujours visible (le bouton ☰ est lui-même caché,
+  // d-lg-none) : rien de ce qui suit ne s'applique alors.
+  var sidebar = document.getElementById("sidebarNav");
+  var bouton = document.getElementById("sidebarToggle");
+  var boutonFermer = document.getElementById("sidebarClose");
+  var fond = document.getElementById("sidebarBackdrop");
+  if (sidebar && bouton && fond) {
+    function ouvrir() {
+      sidebar.classList.add("show");
+      fond.classList.add("show");
+      bouton.setAttribute("aria-expanded", "true");
+    }
+    function fermer() {
+      sidebar.classList.remove("show");
+      fond.classList.remove("show");
+      bouton.setAttribute("aria-expanded", "false");
+    }
+    bouton.addEventListener("click", function () {
+      if (sidebar.classList.contains("show")) fermer(); else ouvrir();
+    });
+    if (boutonFermer) boutonFermer.addEventListener("click", fermer);
+    fond.addEventListener("click", fermer);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") fermer();
+    });
+  }
+
 });
