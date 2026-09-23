@@ -1,0 +1,5 @@
+# Dépendances de développement uniquement (jamais nécessaires en
+# production) — voir tests/README.md pour comment lancer la suite.
+-r requirements.txt
+
+pytest==9.1.1
