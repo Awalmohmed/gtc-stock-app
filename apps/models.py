@@ -159,9 +159,16 @@ class Article(db.Model):
     # Réversible via « désarchiver ». On ne supprime jamais vraiment un
     # article pour préserver l'historique et le rapprochement comptable.
     archive = db.Column(db.Boolean, nullable=False, default=False, server_default=sa.false())
-    # Fournisseur habituel/par défaut de cet article (catalogue) — distinct
-    # du fournisseur d'une livraison précise (voir Entree.fournisseur_id).
-    # Alimenté notamment par l'import de fichier (apps/import_articles.py).
+    # Fournisseur de cet article (catalogue) — obligatoire à la création et
+    # à la modification (voir gtc_data.add_article/maj_article), colonne
+    # restée nullable en base pour ne pas invalider les articles créés
+    # avant que cette règle n'existe. Une réception fournisseur (Entree,
+    # type "reception_fournisseur") reprend AUTOMATIQUEMENT ce fournisseur
+    # plutôt que de le faire ressaisir à chaque mouvement (voir
+    # apps/gtc_data.py, add_entree) ; réceptionner un article sans
+    # fournisseur rattaché est bloqué tant que sa fiche n'est pas
+    # complétée. Alimenté aussi par l'import de fichier
+    # (apps/import_articles.py).
     fournisseur_id = db.Column(db.Integer, db.ForeignKey("fournisseurs.id"), nullable=True)
     # Magasin auquel appartient cet article — un article sans magasin
     # (NULL) n'est visible que par un Administrateur, tant que personne
@@ -218,7 +225,10 @@ class Entree(db.Model):
     """Entrée de stock : réception fournisseur, retour client, ou
     régularisation de stock (voir TYPES_ENTREE). Champs utilisés selon
     le type (voir apps/gtc_data.py, add_entree, pour la validation) :
-      - Réception fournisseur : fournisseur_id + reference (n° de bordereau) ;
+      - Réception fournisseur : fournisseur_id (copié automatiquement
+        depuis Article.fournisseur_id au moment du mouvement — plus de
+        saisie/choix manuel, voir add_entree) + les champs véhicule/
+        chauffeur/documents ci-dessous ;
       - Retour client : reference (nom/référence du client) + motif
         (texte libre, optionnel) ;
       - Régularisation : motif (obligatoire — une courte catégorie,
@@ -235,6 +245,12 @@ class Entree(db.Model):
     # existait alors) — la migration les classe donc ainsi plutôt que de
     # laisser une valeur vide.
     type_entree = db.Column(db.String(30), nullable=False, server_default="reception_fournisseur")
+    # Toujours dérivé de Article.fournisseur_id pour une "reception_fournisseur"
+    # (voir add_entree) — jamais saisi/choisi directement dans le formulaire.
+    # Une copie sur CE mouvement plutôt qu'une simple lecture de
+    # article.fournisseur à l'affichage : l'historique reste exact même si
+    # le fournisseur habituel de l'article change ensuite. Reste NULL pour
+    # les deux autres types (retour_client, régularisation).
     fournisseur_id = db.Column(db.Integer, db.ForeignKey("fournisseurs.id"), nullable=True)
     # reference : nom/référence du client (retour_client seulement — une
     # réception fournisseur utilise désormais ses propres colonnes dédiées
@@ -281,7 +297,17 @@ class Sortie(db.Model):
     """Sortie de stock : mouvement standard (livraison/consommation, avec
     justificatif), ou régularisation de stock (voir TYPES_SORTIE). Champs
     utilisés selon le type (voir apps/gtc_data.py, add_sortie) :
-      - Mouvement de sortie : type_document + reference (n° du document) ;
+      - Mouvement de sortie, justificatif "Bon de livraison" (ou tout
+        justificatif autre que "Bordereau de route") : type_document +
+        reference (n° du document) ;
+      - Mouvement de sortie, justificatif "Bordereau de route" : une
+        ligne de bordereau (voir apps.gtc_data.add_bordereau_route) —
+        bordereau_route_id (le document, potentiellement partagé par
+        PLUSIEURS lignes/articles sous un même numéro) + observation
+        (propre à CETTE ligne) ; reference reprend quand même le numéro
+        du bordereau (mouvement.bordereau_route.numero), pour que
+        l'affichage générique (historique, export) reste simple sans
+        devoir connaître ce cas particulier ;
       - Régularisation : motif (obligatoire — mêmes catégories que pour
         une régularisation d'entrée, voir TYPES_ENTREE), réservée aux
         rôles ROLES_REGULARISATION — pas de justificatif classique."""
@@ -299,6 +325,13 @@ class Sortie(db.Model):
     type_document = db.Column(db.String(50), nullable=True)
     reference = db.Column(db.String(50), nullable=True)
     motif = db.Column(db.String(255), nullable=True)
+    # Bordereau de route (voir BordereauRoute ci-dessous) : NULL pour tout
+    # autre justificatif/type de sortie. Plusieurs lignes (une par
+    # article expédié) peuvent partager le même bordereau_route_id.
+    bordereau_route_id = db.Column(db.Integer, db.ForeignKey("bordereaux_route.id"), nullable=True)
+    # Observation propre à CETTE ligne du bordereau (ex. "carton
+    # endommagé") — sans rapport avec `motif`, réservé à la régularisation.
+    observation = db.Column(db.String(255), nullable=True)
     utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
 
     utilisateur = db.relationship("Utilisateur")
@@ -313,6 +346,41 @@ class Sortie(db.Model):
     @property
     def type_sortie_classe(self):
         return TYPES_SORTIE.get(self.type_sortie, (self.type_sortie, "secondary"))[1]
+
+
+class BordereauRoute(db.Model):
+    """En-tête d'un bordereau de route — le document papier réellement
+    utilisé chez GTC sarl pour justifier une sortie de stock par
+    livraison/expédition (voir apps.gtc_data.add_bordereau_route). Un
+    même bordereau (un même numéro) peut couvrir PLUSIEURS articles :
+    chacun devient sa propre ligne Sortie (voir Sortie.bordereau_route_id
+    / Sortie.observation), reliées ici par `lignes`. Champs d'en-tête
+    (communs à toutes les lignes) : numéro, date d'expédition, magasin
+    d'expédition, destination (texte libre : agence, magasin ou lieu de
+    livraison — pas forcément un Magasin GTC), client destinataire,
+    véhicule, chauffeur, n° de facture associé (optionnel)."""
+
+    __tablename__ = "bordereaux_route"
+
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    date_expedition = db.Column(db.Date, nullable=False)
+    magasin_expedition_id = db.Column(db.Integer, db.ForeignKey("magasins.id"), nullable=False)
+    destination = db.Column(db.String(150), nullable=False)
+    client_destinataire = db.Column(db.String(150), nullable=False)
+    numero_vehicule = db.Column(db.String(50), nullable=False)
+    nom_chauffeur = db.Column(db.String(150), nullable=False)
+    numero_facture = db.Column(db.String(50), nullable=True)
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey("utilisateurs.id"), nullable=True)
+
+    magasin_expedition = db.relationship("Magasin")
+    utilisateur = db.relationship("Utilisateur")
+    # order_by : affichage stable (ordre de saisie) plutôt que l'ordre
+    # arbitraire que la base pourrait retourner.
+    lignes = db.relationship("Sortie", backref="bordereau_route", order_by="Sortie.id")
+
+    def __repr__(self):
+        return f"<BordereauRoute {self.numero}>"
 
 
 class Transfert(db.Model):

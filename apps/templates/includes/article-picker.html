@@ -15,19 +15,38 @@
       (formulaire de transfert, Administrateur seulement — un
       Gestionnaire de stock n'a pas ce champ, son magasin de rattachement
       s'applique automatiquement côté serveur). Omettre sinon.
+    - article_picker_fournisseur_cible (optionnel) : id d'un conteneur
+      (voir pages/entrees.html, bloc Réception fournisseur) contenant un
+      champ [data-article-fournisseur-champ] et une alerte
+      [data-article-fournisseur-alerte], mis à jour automatiquement avec
+      le fournisseur de l'article choisi (gtc-stock.js, section 5) — la
+      réception n'a plus de champ Fournisseur propre, il est dérivé de
+      l'article. Omettre partout ailleurs (retour client, régularisation,
+      sortie, transfert : pas de notion de fournisseur).
+    - article_picker_field_name (optionnel) : nom du champ cible, par
+      défaut "article_id". À surcharger en "xxx[]" pour une ligne d'une
+      LISTE d'articles répétable (voir pages/sorties.html, bordereau de
+      route — plusieurs articles sous un même bordereau, une ligne par
+      article, chacune avec sa propre instance de ce composant).
 
-  Résultat transmis au formulaire : un champ caché name="article_id",
-  comme le faisait le <select> qu'il remplace — aucun changement côté
-  serveur (gtc_data.add_entree / add_sortie / transferer_stock).
+  Résultat transmis au formulaire : un champ caché portant
+  article_picker_field_name (par défaut name="article_id", comme le
+  faisait le <select> qu'il remplace) — aucun changement côté serveur
+  pour les appelants qui ne surchargent pas ce nom (gtc_data.add_entree /
+  add_sortie / transferer_stock).
 #}
 <div class="position-relative" data-article-picker
      {% if article_picker_magasin_source_input is defined and article_picker_magasin_source_input %}
      data-magasin-source-input="{{ article_picker_magasin_source_input }}"
+     {% endif %}
+     {% if article_picker_fournisseur_cible is defined and article_picker_fournisseur_cible %}
+     data-fournisseur-cible="{{ article_picker_fournisseur_cible }}"
      {% endif %}>
   <input type="text" class="form-control" id="{{ article_picker_id }}-texte"
          data-article-picker-input autocomplete="off" required
          placeholder="Rechercher un article (référence ou désignation)…">
-  <input type="hidden" name="article_id" data-article-picker-value>
+  <input type="hidden" name="{{ article_picker_field_name if article_picker_field_name is defined and article_picker_field_name else 'article_id' }}"
+         data-article-picker-value>
   <div class="list-group position-absolute w-100 shadow-sm"
        style="z-index:1055; display:none; max-height:260px; overflow-y:auto;"
        data-article-picker-suggestions></div>

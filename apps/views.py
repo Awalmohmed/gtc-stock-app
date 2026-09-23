@@ -13,9 +13,9 @@ from jinja2  import TemplateNotFound
 from apps import app, db
 from apps.gtc_data import (
   get_stats, get_all_articles, get_article, get_historique, get_entrees, get_sorties,
-  add_entree, add_sortie, get_all_users, get_rapprochement,
+  add_entree, add_sortie, add_bordereau_route, get_all_users, get_rapprochement,
   get_all_fournisseurs, add_fournisseur, rechercher_fournisseurs, get_journal, vider_journal,
-  get_alertes, traiter_alerte,
+  get_alertes, traiter_alerte, get_analyse_articles, PERIODES_ANALYSE,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
   maj_magasin, add_article, maj_article, archiver_article, desarchiver_article,
   supprimer_definitivement_article, get_articles_archives, rechercher_articles,
@@ -140,8 +140,18 @@ def pages_entrees():
 @app.route('/pages/sorties/')
 @login_required
 def pages_sorties():
+  # magasins/magasin_expedition_nom : pour le champ « Magasin d'expédition »
+  # du bloc Bordereau de route — même principe que magasin_reception_nom
+  # sur la page Entrées (voir pages_entrees) : libre (sélecteur) pour un
+  # rôle qui voit tous les magasins, imposé (affiché, non modifiable)
+  # pour un Gestionnaire de stock.
+  utilisateur = get_user_by_identifiant(session.get('identifiant'))
+  magasin_expedition_nom = (
+    utilisateur.magasin.nom if utilisateur and utilisateur.magasin else None
+  )
   return render_template('pages/sorties.html', segment='sorties', parent='pages',
-                          mouvements=get_sorties())
+                          mouvements=get_sorties(), magasins=get_all_magasins(),
+                          magasin_expedition_nom=magasin_expedition_nom)
 
 def _parser_date_formulaire(valeur):
   """Convertit la date d'un <input type="date"> (format AAAA-MM-JJ) en
@@ -244,6 +254,67 @@ def creer_sortie():
     flash(str(e), 'danger')
     return redirect(url_for('pages_sorties'))
   flash("Sortie de stock enregistrée avec succès.", 'success')
+  return redirect(url_for('pages_sorties'))
+
+@app.route('/pages/sorties/bordereau-route/nouveau', methods=['POST'])
+@login_required
+def creer_bordereau_route():
+  """Bordereau de route (justificatif dédié de Mouvement de sortie, voir
+  templates/pages/sorties.html) : un même numéro peut couvrir PLUSIEURS
+  articles, saisis en lignes dynamiques (bordereau_article_id[] /
+  bordereau_quantite[] / bordereau_observation[], même index côté client
+  — voir static/assets/js/gtc-stock.js) ; une ligne dont l'article n'a
+  pas été renseigné (rangée ajoutée puis laissée vide) est ignorée plutôt
+  que de faire échouer tout le bordereau. Toute la validation « de fond »
+  reste dans add_bordereau_route, seule source de vérité."""
+  utilisateur = get_user_by_identifiant(session.get('identifiant'))
+  try:
+    # Magasin d'expédition : jamais pris tel quel dans le formulaire pour
+    # un Gestionnaire de stock (imposé à son propre magasin côté serveur,
+    # même précaution que magasin_id pour la réception fournisseur) —
+    # libre pour un rôle qui voit tous les magasins.
+    if session.get('role') in ROLES_TOUS_MAGASINS:
+      magasin_expedition_id = request.form.get('magasin_expedition_id', type=int)
+    else:
+      magasin_expedition_id = utilisateur.magasin_id if utilisateur else None
+
+    date_expedition = _parser_date_formulaire(request.form.get('date_expedition') or '')
+
+    article_ids = request.form.getlist('bordereau_article_id[]')
+    quantites = request.form.getlist('bordereau_quantite[]')
+    observations = request.form.getlist('bordereau_observation[]')
+    lignes = []
+    for i, article_id in enumerate(article_ids):
+      if not article_id:
+        continue
+      quantite_brute = quantites[i] if i < len(quantites) else ''
+      try:
+        quantite = int(quantite_brute)
+      except (TypeError, ValueError):
+        raise ValueError("Merci d'indiquer une quantité valide pour chaque article du bordereau.")
+      lignes.append({
+        'article_id': int(article_id),
+        'quantite': quantite,
+        'observation': observations[i] if i < len(observations) else None,
+      })
+
+    bordereau = add_bordereau_route(
+      request.form.get('numero_bordereau') or '',
+      date_expedition, magasin_expedition_id,
+      request.form.get('destination') or '',
+      request.form.get('client_destinataire') or '',
+      request.form.get('bordereau_numero_vehicule') or '',
+      request.form.get('bordereau_nom_chauffeur') or '',
+      request.form.get('numero_facture') or '',
+      lignes, utilisateur,
+    )
+  except ValueError as e:
+    flash(str(e), 'danger')
+    return redirect(url_for('pages_sorties'))
+  flash(
+    f"Bordereau de route {bordereau.numero} enregistré avec succès "
+    f"({len(bordereau.lignes)} article(s)).", 'success',
+  )
   return redirect(url_for('pages_sorties'))
 
 @app.route('/pages/articles/recherche')

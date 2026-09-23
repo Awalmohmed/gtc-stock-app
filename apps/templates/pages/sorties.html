@@ -1,27 +1,46 @@
 {#
   Sorties de stock — route pages_sorties (GET /pages/sorties/), tout rôle
-  connecté. Reçoit : mouvements (get_sorties).
-  Sections : 1) formulaire « Nouvelle sortie » -> POST creer_sortie ;
-  2) tableau des sorties enregistrées (récent -> ancien).
-  Article choisi via un champ de recherche (autocomplétion — voir
-  includes/article-picker.html) plutôt qu'une liste déroulante ; ce champ
-  est commun aux deux types (pas de scope par magasin nécessaire ici,
-  contrairement à la Réception fournisseur du formulaire d'entrée).
+  connecté. Reçoit : mouvements (get_sorties), magasins,
+  magasin_expedition_nom (magasin de rattachement de l'utilisateur, pour
+  le champ Magasin d'expédition du bloc Bordereau de route — None pour un
+  rôle qui voit tous les magasins, sans objet dans ce cas).
+  Sections : 1) formulaire « Nouvelle sortie » -> POST creer_sortie (ou
+  creer_bordereau_route, voir plus bas) ; 2) tableau des sorties
+  enregistrées (récent -> ancien).
 
-  Type de sortie (voir apps/models.py, TYPES_SORTIE), même principe que
-  le formulaire d'entrée (entrees.html) : le sélecteur en tête de
-  formulaire affiche/masque le bloc de champs pertinent — logique
+  Type de sortie (voir apps/models.py, TYPES_SORTIE) : le sélecteur en
+  tête de formulaire affiche/masque le bloc de champs pertinent — logique
   générique (data-type-toggle-*, voir static/assets/js/gtc-stock.js,
-  section 6), pas de script propre à cette page :
-    - Mouvement de sortie : justificatif (type de document + n° du
-      document) — comportement standard, inchangé ;
-    - Régularisation : motif obligatoire (liste + « Autre », même
-      mécanisme générique data-motif-regularisation, section 7) —
-      réservée à un Administrateur ou un Gestionnaire de stock (voir
-      ROLES_REGULARISATION), pas de justificatif classique.
-  Toute validation réelle (stock suffisant, article mouvementable,
-  champs obligatoires par type, rôle pour une régularisation...) est
-  côté serveur (gtc_data.add_sortie) ; ici data-validate = confort.
+  section 6), partagée avec le formulaire d'entrée (entrees.html).
+
+  Justificatif "Bordereau de route" (voir apps.models.BordereauRoute) :
+  le document papier réellement utilisé chez GTC sarl, pouvant couvrir
+  PLUSIEURS articles sous un même numéro — remplace le champ générique
+  "N° du document" par des champs dédiés + des lignes d'articles
+  répétables (recherche/autocomplete, quantité, observation ; "Ajouter un
+  article", voir gtc-stock.js section 11). Le sélecteur "Justificatif"
+  est un DEUXIÈME niveau de bascule, IMBRIQUÉ dans le bloc "Mouvement de
+  sortie" (voir data-type-toggle-for sur chaque groupe, gtc-stock.js
+  section 6) : Bon de livraison, Bordereau de route et Régularisation
+  sont donc TROIS blocs terminaux totalement indépendants, chacun avec
+  SES PROPRES champs Article/Quantité/Date — jamais partagés entre eux
+  (un bordereau a besoin de PLUSIEURS articles, ce qu'un champ Article
+  unique partagé avec les deux autres cas ne permettrait pas proprement).
+
+  Le formulaire poste vers DEUX routes différentes selon le justificatif
+  actif (voir data-action-sortie / data-action-bordereau-route sur le
+  <form>, et gtc-stock.js section 11 pour le <select> qui pilote
+  l'action) : Bon de livraison et Régularisation vers creer_sortie
+  (inchangé), Bordereau de route vers creer_bordereau_route (plusieurs
+  lignes, champs d'en-tête propres — voir gtc_data.add_bordereau_route).
+
+  « Régularisation » n'est proposée qu'à un Administrateur ou un
+  Gestionnaire de stock (voir ROLES_REGULARISATION) — la vérification
+  qui compte reste côté serveur (gtc_data.add_sortie). Le motif de
+  régularisation (liste + « Autre ») suit la logique générique
+  (data-motif-regularisation, section 7 de gtc-stock.js).
+  Toute validation réelle est côté serveur (gtc_data.add_sortie /
+  add_bordereau_route) ; ici data-validate = confort.
 #}
 {% extends 'layouts/gtc-base.html' %}
 
@@ -30,17 +49,25 @@
 
 {% block content %}
 
+{# col-12 : une seule carte sur cette ligne (pas de colonne sœur) — la
+   laisser en col-md-6 la coincerait à moitié de la largeur de l'écran,
+   avec la moitié droite vide, et forcerait les paires de champs internes
+   (Quantité/Date, voir plus bas) à repasser en 1 colonne bien avant que
+   la largeur réelle disponible ne le justifie. #}
 <div class="row g-3">
   <!-- Formulaire Sortie -->
-  <div class="col-md-6">
+  <div class="col-12">
     <div class="card table-card p-3 h-100">
       <h6 class="mb-3"><i class="bi bi-box-arrow-up text-danger"></i> Nouvelle sortie</h6>
-      <form action="{{ url_for('creer_sortie') }}" method="post" data-validate novalidate>
+      <form id="form-sortie" action="{{ url_for('creer_sortie') }}" method="post" data-validate novalidate
+            data-action-sortie="{{ url_for('creer_sortie') }}"
+            data-action-bordereau-route="{{ url_for('creer_bordereau_route') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="mb-2">
           <label class="form-label small fw-semibold">Type de sortie</label>
-          <select class="form-select" name="type_sortie" data-type-toggle-select required>
+          <select class="form-select" id="sortie-type-sortie" name="type_sortie"
+                  data-type-toggle-select required>
             <option value="mouvement_sortie" selected>Mouvement de sortie</option>
             {% if current_user and current_user.role in ['Administrateur', 'Gestionnaire de stock'] %}
             <option value="regularisation">Régularisation</option>
@@ -48,52 +75,170 @@
           </select>
         </div>
 
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Article</label>
-          {% set article_picker_id = 'sortie-article' %}
-          {% include 'includes/article-picker.html' %}
-        </div>
-
-        <div class="row">
-          <div class="col-12 col-sm-6 mb-2">
-            <label class="form-label small fw-semibold">Quantité</label>
-            <input type="number" name="quantite" min="1" class="form-control" placeholder="0" required>
-          </div>
-          <div class="col-12 col-sm-6 mb-2">
-            <label class="form-label small fw-semibold">Date</label>
-            <input type="date" name="date" class="form-control" required>
-          </div>
-        </div>
-
         <!-- Mouvement de sortie -->
-        <div data-type-toggle-groupe="mouvement_sortie">
+        <div data-type-toggle-groupe="mouvement_sortie" data-type-toggle-for="sortie-type-sortie">
           <div class="mb-2">
             <label class="form-label small fw-semibold">Justificatif</label>
-            <select class="form-select" name="type_document" data-type-toggle-champ required>
+            <select class="form-select" id="sortie-type-document" name="type_document"
+                    data-type-toggle-champ data-type-toggle-select required>
               <option value="" selected disabled>Type de document</option>
               <option>Bon de livraison</option>
               <option>Bordereau de route</option>
             </select>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">N° du document</label>
-            <input type="text" name="reference" class="form-control" placeholder="ex : BL-2026-0087"
-                   data-type-toggle-champ>
+
+          <!-- Bon de livraison (et tout justificatif hors bordereau de route) -->
+          <div data-type-toggle-groupe="Bon de livraison" data-type-toggle-for="sortie-type-document" hidden>
+            <div class="row">
+              <div class="col-12 col-sm-6 mb-2">
+                <label class="form-label small fw-semibold">Article</label>
+                {% set article_picker_id = 'sortie-article-standard' %}
+                {% include 'includes/article-picker.html' %}
+              </div>
+              <div class="col-12 col-sm-6 mb-2">
+                <label class="form-label small fw-semibold">Quantité</label>
+                <input type="number" name="quantite" min="1" class="form-control" placeholder="0"
+                       data-type-toggle-champ required>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-12 col-sm-6 mb-2">
+                <label class="form-label small fw-semibold">Date</label>
+                <input type="date" name="date" class="form-control" data-type-toggle-champ required>
+              </div>
+              <div class="col-12 col-sm-6 mb-3">
+                <label class="form-label small fw-semibold">N° du document</label>
+                <input type="text" name="reference" class="form-control" placeholder="ex : BL-2026-0087"
+                       data-type-toggle-champ required>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bordereau de route -->
+          <div data-type-toggle-groupe="Bordereau de route" data-type-toggle-for="sortie-type-document" hidden>
+            <div class="row">
+              <div class="col-12 col-sm-6 mb-2">
+                <label class="form-label small fw-semibold">N° de bordereau de route</label>
+                <input type="text" name="numero_bordereau" class="form-control" placeholder="ex : BR-2026-0143"
+                       data-type-toggle-champ required>
+                <div class="form-text">Doit correspondre au numéro déjà imprimé sur le bordereau papier.</div>
+              </div>
+              <div class="col-12 col-sm-6 mb-2">
+                <label class="form-label small fw-semibold">Date d'expédition</label>
+                <input type="date" name="date_expedition" class="form-control" data-type-toggle-champ required>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-12 col-sm-6 mb-2">
+                <label class="form-label small fw-semibold">Magasin d'expédition</label>
+                {% if current_user and current_user.role in ['Administrateur', 'Comptable'] %}
+                <select class="form-select" name="magasin_expedition_id" data-type-toggle-champ required>
+                  <option value="" selected disabled>Sélectionner un magasin</option>
+                  {% for m in magasins %}
+                  <option value="{{ m.id }}">{{ m.nom }}</option>
+                  {% endfor %}
+                </select>
+                {% elif magasin_expedition_nom %}
+                <input type="text" class="form-control" value="{{ magasin_expedition_nom }}" disabled>
+                <div class="form-text">Votre magasin de rattachement — non modifiable.</div>
+                {% else %}
+                <p class="text-danger small mb-0">Aucun magasin ne vous est rattaché : contactez un administrateur.</p>
+                {% endif %}
+              </div>
+              <div class="col-12 col-sm-6 mb-2">
+                <label class="form-label small fw-semibold">Destination</label>
+                <input type="text" name="destination" class="form-control"
+                       placeholder="ex : Agence Bonabéri" data-type-toggle-champ required>
+                <div class="form-text">Agence, magasin ou lieu de livraison.</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-12 col-sm-6 mb-2">
+                <label class="form-label small fw-semibold">Client destinataire</label>
+                <input type="text" name="client_destinataire" class="form-control"
+                       placeholder="ex : Sté Dupont" data-type-toggle-champ required>
+              </div>
+              <div class="col-12 col-sm-6 mb-2">
+                <label class="form-label small fw-semibold">N° de facture associé (optionnel)</label>
+                <input type="text" name="numero_facture" class="form-control" placeholder="ex : FA-2026-0087">
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-12 col-sm-6 mb-3">
+                <label class="form-label small fw-semibold">N° du véhicule</label>
+                <input type="text" name="bordereau_numero_vehicule" class="form-control"
+                       placeholder="ex : AB-123-CD" data-type-toggle-champ required>
+              </div>
+              <div class="col-12 col-sm-6 mb-3">
+                <label class="form-label small fw-semibold">Nom du chauffeur</label>
+                <input type="text" name="bordereau_nom_chauffeur" class="form-control"
+                       placeholder="ex : Jean Dupont" data-type-toggle-champ required>
+              </div>
+            </div>
+
+            <label class="form-label small fw-semibold">Articles expédiés</label>
+            <div id="bordereau-lignes-conteneur">
+              <div class="row g-2 align-items-start mb-2" data-bordereau-ligne>
+                <div class="col-12 col-sm-5">
+                  {% set article_picker_id = 'bordereau-article' %}
+                  {% set article_picker_field_name = 'bordereau_article_id[]' %}
+                  {% include 'includes/article-picker.html' %}
+                </div>
+                <div class="col-6 col-sm-2">
+                  <input type="number" name="bordereau_quantite[]" min="1" class="form-control"
+                         placeholder="Quantité" data-type-toggle-champ required>
+                </div>
+                <div class="col-6 col-sm-4">
+                  <input type="text" name="bordereau_observation[]" class="form-control"
+                         placeholder="Observation (optionnel)">
+                </div>
+                <div class="col-12 col-sm-1 text-end">
+                  <button type="button" class="btn btn-outline-danger btn-sm" disabled
+                          data-bordereau-ligne-retirer title="Retirer cette ligne">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="bordereau-ajouter-ligne">
+              <i class="bi bi-plus-lg"></i> Ajouter un article
+            </button>
           </div>
         </div>
 
         <!-- Régularisation -->
-        <div data-type-toggle-groupe="regularisation" hidden>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Motif</label>
-            <select class="form-select" name="motif_regularisation" data-type-toggle-champ
-                    data-motif-regularisation="sortie-motif-regul-autre-groupe">
-              <option value="" selected disabled>Sélectionner un motif</option>
-              <option value="Inventaire">Inventaire</option>
-              <option value="Casse/perte">Casse / perte</option>
-              <option value="Erreur de saisie">Erreur de saisie</option>
-              <option value="Autre">Autre</option>
-            </select>
+        <div data-type-toggle-groupe="regularisation" data-type-toggle-for="sortie-type-sortie" hidden>
+          <div class="row">
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Article</label>
+              {% set article_picker_id = 'sortie-article-regularisation' %}
+              {% include 'includes/article-picker.html' %}
+            </div>
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Quantité</label>
+              <input type="number" name="quantite" min="1" class="form-control" placeholder="0"
+                     data-type-toggle-champ required>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Date</label>
+              <input type="date" name="date" class="form-control" data-type-toggle-champ required>
+            </div>
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Motif</label>
+              <select class="form-select" name="motif_regularisation" data-type-toggle-champ
+                      data-motif-regularisation="sortie-motif-regul-autre-groupe">
+                <option value="" selected disabled>Sélectionner un motif</option>
+                <option value="Inventaire">Inventaire</option>
+                <option value="Casse/perte">Casse / perte</option>
+                <option value="Erreur de saisie">Erreur de saisie</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
           </div>
           <div class="mb-3" id="sortie-motif-regul-autre-groupe" hidden>
             <label class="form-label small fw-semibold">Précisez</label>
@@ -135,7 +280,22 @@
             {% endif %}
           </td>
           <td>{{ m.article }}</td>
-          <td>{{ m.detail }}</td>
+          <td>
+            {{ m.detail }}
+            {% if m.bordereau_destination %}
+            <div class="small text-muted">
+              {{ m.bordereau_magasin_expedition }} → {{ m.bordereau_destination }}
+              ({{ m.bordereau_client_destinataire }})
+            </div>
+            <div class="small text-muted">
+              Véhicule {{ m.bordereau_numero_vehicule }} — {{ m.bordereau_nom_chauffeur }}
+              {% if m.bordereau_numero_facture %} — Facture {{ m.bordereau_numero_facture }}{% endif %}
+            </div>
+            {% if m.observation %}
+            <div class="small text-muted">Observation : {{ m.observation }}</div>
+            {% endif %}
+            {% endif %}
+          </td>
           <td>{{ m.quantite }}</td>
           <td>{{ m.saisi_par }}</td>
         </tr>

@@ -19,8 +19,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from apps import db
 from apps.models import (
     Utilisateur, Article, Entree, Sortie, Transfert, Fournisseur, JournalActivite,
-    Magasin, Alerte, ROLE_CLASSES, ROLES_TOUS_MAGASINS, TYPES_ENTREE, TYPES_SORTIE,
-    ROLES_REGULARISATION,
+    Magasin, Alerte, BordereauRoute, ROLE_CLASSES, ROLES_TOUS_MAGASINS, TYPES_ENTREE,
+    TYPES_SORTIE, ROLES_REGULARISATION,
 )
 from apps import sage_connector
 from apps import mailer
@@ -521,6 +521,21 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
         ligne["sous_type"] = mouvement.type_sortie_libelle
         ligne["sous_type_classe"] = mouvement.type_sortie_classe
         ligne["detail"] = mouvement.reference or mouvement.motif or "—"
+        # Bordereau de route (voir apps.models.BordereauRoute) : champs
+        # d'en-tête du document, communs à toutes ses lignes/articles —
+        # affichés en plus du détail sur la fiche de stock et l'historique
+        # des sorties (voir templates/pages/sorties.html, fiche_stock.html)
+        # — None ailleurs n'est jamais lu. `observation` reste propre à
+        # CETTE ligne (Sortie.observation), pas à l'en-tête.
+        if mouvement.type_document == "Bordereau de route" and mouvement.bordereau_route:
+            br = mouvement.bordereau_route
+            ligne["bordereau_magasin_expedition"] = br.magasin_expedition.nom if br.magasin_expedition else "—"
+            ligne["bordereau_destination"] = br.destination
+            ligne["bordereau_client_destinataire"] = br.client_destinataire
+            ligne["bordereau_numero_vehicule"] = br.numero_vehicule
+            ligne["bordereau_nom_chauffeur"] = br.nom_chauffeur
+            ligne["bordereau_numero_facture"] = br.numero_facture
+            ligne["observation"] = mouvement.observation
     else:
         ligne["detail"] = ligne["reference"]
     return ligne
@@ -1098,6 +1113,132 @@ def add_sortie(article_id, date_mouvement, quantite, type_sortie, utilisateur, *
         # sortie (mailer.envoyer_alerte_seuil n'élève jamais d'exception).
         mailer.envoyer_alerte_seuil(article)
     return sortie
+
+
+def add_bordereau_route(numero, date_expedition, magasin_expedition_id, destination,
+                         client_destinataire, numero_vehicule, nom_chauffeur, numero_facture,
+                         lignes, utilisateur):
+    """Enregistre un bordereau de route — le document papier réellement
+    utilisé chez GTC sarl pour justifier une sortie de stock par
+    livraison/expédition (voir apps.models.BordereauRoute) — ainsi que
+    les sorties de stock associées. UN bordereau peut couvrir PLUSIEURS
+    articles : `lignes` est une liste de {"article_id", "quantite",
+    "observation"} (une par article expédié sous ce même numéro).
+
+    `magasin_expedition_id` : pré-rempli avec le magasin de l'utilisateur
+    côté formulaire pour un Gestionnaire de stock, mais JAMAIS pris tel
+    quel ici pour ce rôle (imposé à son propre magasin — même précaution
+    que add_entree pour la réception fournisseur) ; libre pour un
+    Comptable/Administrateur. Chaque article de `lignes` doit appartenir
+    à ce magasin : un bordereau ne mélange pas les provenances.
+
+    Toute la validation (existence/périmètre/stock) porte sur TOUTES les
+    lignes AVANT la moindre écriture en base, pour que l'enregistrement
+    reste tout-ou-rien : soit le bordereau et toutes ses lignes sont
+    créés, soit rien ne l'est. Le stock est vérifié de façon CUMULÉE
+    (pas seulement ligne par ligne) : un même article peut apparaître sur
+    plusieurs lignes du même bordereau.
+
+    Lève ValueError si le numéro est vide ou déjà utilisé, si un champ
+    d'en-tête obligatoire manque, si `lignes` est vide, si une ligne a une
+    quantité invalide, si un article est introuvable / hors périmètre /
+    archivé / d'un autre magasin que `magasin_expedition_id`, ou si le
+    stock disponible (cumulé) est insuffisant pour un article."""
+    numero = (numero or "").strip()
+    if not numero:
+        raise ValueError("Merci d'indiquer le numéro du bordereau de route.")
+    if BordereauRoute.query.filter_by(numero=numero).first():
+        raise ValueError(f"Le bordereau de route « {numero} » existe déjà.")
+
+    if not date_expedition:
+        raise ValueError("Merci d'indiquer la date d'expédition.")
+    if not magasin_expedition_id or db.session.get(Magasin, magasin_expedition_id) is None:
+        raise ValueError("Merci d'indiquer le magasin d'expédition.")
+
+    destination = (destination or "").strip()
+    client_destinataire = (client_destinataire or "").strip()
+    numero_vehicule = (numero_vehicule or "").strip()
+    nom_chauffeur = (nom_chauffeur or "").strip()
+    numero_facture = (numero_facture or "").strip() or None
+    if not destination:
+        raise ValueError("Merci d'indiquer la destination.")
+    if not client_destinataire:
+        raise ValueError("Merci d'indiquer le nom du client destinataire.")
+    if not numero_vehicule:
+        raise ValueError("Merci d'indiquer le numéro du véhicule.")
+    if not nom_chauffeur:
+        raise ValueError("Merci d'indiquer le nom du chauffeur.")
+
+    if not lignes:
+        raise ValueError("Merci d'ajouter au moins un article au bordereau.")
+
+    # quantite_restante suit le stock disponible au fil des lignes, pour
+    # détecter un dépassement CUMULÉ quand un même article revient sur
+    # plusieurs lignes — pas seulement un dépassement ligne par ligne.
+    quantite_restante = {}
+    lignes_resolues = []
+    for ligne in lignes:
+        quantite = ligne.get("quantite")
+        if not quantite or quantite <= 0:
+            raise ValueError("Chaque ligne du bordereau doit avoir une quantité supérieure à zéro.")
+        article = _article_mouvementable(ligne.get("article_id"))
+        if article.magasin_id != magasin_expedition_id:
+            raise ValueError(
+                f"« {article.nom} » n'appartient pas au magasin d'expédition sélectionné."
+            )
+        if article.id not in quantite_restante:
+            quantite_restante[article.id] = article.quantite
+        quantite_restante[article.id] -= quantite
+        if quantite_restante[article.id] < 0:
+            raise ValueError(
+                f"Stock insuffisant pour « {article.nom} » : {article.quantite} disponible(s) "
+                "au total sur ce bordereau."
+            )
+        observation = (ligne.get("observation") or "").strip() or None
+        lignes_resolues.append((article, quantite, observation))
+
+    bordereau = BordereauRoute(
+        numero=numero, date_expedition=date_expedition, magasin_expedition_id=magasin_expedition_id,
+        destination=destination, client_destinataire=client_destinataire,
+        numero_vehicule=numero_vehicule, nom_chauffeur=nom_chauffeur, numero_facture=numero_facture,
+        utilisateur_id=utilisateur.id if utilisateur else None,
+    )
+    db.session.add(bordereau)
+
+    articles_en_alerte = []
+    for article, quantite, observation in lignes_resolues:
+        sortie = Sortie(
+            article_id=article.id, date=date_expedition, quantite=quantite,
+            type_sortie="mouvement_sortie", type_document="Bordereau de route",
+            reference=numero, observation=observation, bordereau_route=bordereau,
+            utilisateur_id=utilisateur.id if utilisateur else None,
+        )
+        db.session.add(sortie)
+        statut_avant = article.statut
+        article.quantite -= quantite
+        article.dernier_mouvement = date_expedition.strftime("%d/%m/%Y")
+        _recalculer_statut(article)
+        # Même logique que add_sortie : notifier seulement sur la
+        # transition vers l'alerte, pas à chaque sortie qui y reste.
+        if statut_avant != "Alerte" and article.statut == "Alerte":
+            articles_en_alerte.append(article)
+
+    _journaliser(
+        utilisateur, "sortie_stock",
+        f"Bordereau de route {numero} — {len(lignes_resolues)} article(s), "
+        f"destination « {destination} ».",
+    )
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError(f"Le bordereau de route « {numero} » existe déjà.")
+
+    for article in articles_en_alerte:
+        # Après le commit : un échec d'envoi ne doit pas annuler le
+        # bordereau (mailer.envoyer_alerte_seuil n'élève jamais d'exception).
+        mailer.envoyer_alerte_seuil(article)
+    return bordereau
 
 
 # ---------------------------------------------------------------------

@@ -94,6 +94,30 @@ def _construire_excel(nom_feuille, entetes, lignes):
 # ---------------------------------------------------------------------
 # Fiche de stock
 # ---------------------------------------------------------------------
+def _detail_historique(h):
+    """Texte de la colonne "Référence" d'une ligne d'historique — la
+    référence/le motif de base (voir gtc_data._mouvement_vers_dict),
+    complété du résumé du bordereau de route le cas échéant (tous les
+    champs d'en-tête du document + l'observation propre à CETTE ligne).
+    Une seule ligne de texte (pas de retour à la ligne) : plus sûr pour
+    le rendu PDF (les cellules de _construire_pdf ne sont pas des
+    Paragraph, un \\n littéral ne s'y afficherait pas correctement)."""
+    detail = h["detail"]
+    if not h.get("bordereau_destination"):
+        return detail
+    resume = (
+        f"{h.get('bordereau_magasin_expedition') or '—'} -> {h['bordereau_destination']} "
+        f"({h.get('bordereau_client_destinataire') or '—'}) — "
+        f"Véhicule {h.get('bordereau_numero_vehicule') or '—'} — "
+        f"{h.get('bordereau_nom_chauffeur') or '—'}"
+    )
+    if h.get("bordereau_numero_facture"):
+        resume += f" — Facture {h['bordereau_numero_facture']}"
+    if h.get("observation"):
+        resume += f" — Observation : {h['observation']}"
+    return f"{detail} | {resume}"
+
+
 def fiche_stock_pdf(article, historique):
     infos = [
         ["Référence", article.reference],
@@ -104,12 +128,14 @@ def fiche_stock_pdf(article, historique):
     ]
     # h["detail"] retombe sur le motif quand une Entree n'a pas de
     # référence externe (ex. régularisation, sans bordereau) — voir
-    # gtc_data._mouvement_vers_dict.
-    lignes_historique = [["Date", "Type", "Référence", "Quantité", "Solde après mouvement"]]
+    # gtc_data._mouvement_vers_dict. h["fournisseur"] n'existe que pour une
+    # réception fournisseur (dérivé de l'article au moment du mouvement,
+    # jamais saisi) — "—" pour tout le reste (sorties, retours, régularisations).
+    lignes_historique = [["Date", "Type", "Fournisseur", "Référence", "Quantité", "Solde après mouvement"]]
     lignes_historique += [
-        [h["date"], h["type"], h["detail"], h["quantite"], str(h["solde"])]
+        [h["date"], h["type"], h.get("fournisseur") or "—", _detail_historique(h), h["quantite"], str(h["solde"])]
         for h in historique
-    ] or [["Aucun mouvement enregistré.", "", "", "", ""]]
+    ] or [["Aucun mouvement enregistré.", "", "", "", "", ""]]
 
     return _construire_pdf(
         f"Fiche de stock — {article.nom}",
@@ -136,12 +162,14 @@ def fiche_stock_excel(article, historique):
     resume.column_dimensions["B"].width = 30
 
     historique_feuille = classeur.create_sheet("Historique")
-    historique_feuille.append(["Date", "Type", "Référence", "Quantité", "Solde après mouvement"])
+    historique_feuille.append(["Date", "Type", "Fournisseur", "Référence", "Quantité", "Solde après mouvement"])
     for cellule in historique_feuille[1]:
         cellule.font = Font(bold=True)
     for h in historique:
-        historique_feuille.append([h["date"], h["type"], h["detail"], h["quantite_brute"], h["solde"]])
-    for i in range(1, 6):
+        historique_feuille.append([
+            h["date"], h["type"], h.get("fournisseur") or "—", _detail_historique(h), h["quantite_brute"], h["solde"],
+        ])
+    for i in range(1, 7):
         historique_feuille.column_dimensions[get_column_letter(i)].width = 18
 
     tampon = io.BytesIO()
