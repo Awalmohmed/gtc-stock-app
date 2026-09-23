@@ -98,7 +98,7 @@
 {% for u in utilisateurs %}
 <div class="modal fade" id="modalModifierUtilisateur{{ u.id }}" tabindex="-1"
      aria-labelledby="titreModifierUtilisateur{{ u.id }}" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <form action="{{ url_for('modifier_utilisateur', user_id=u.id) }}" method="post" class="js-form-utilisateur">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -107,30 +107,46 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
         </div>
         <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label small fw-semibold" for="usr-nom-{{ u.id }}">Nom complet</label>
-            <input type="text" id="usr-nom-{{ u.id }}" name="nom" class="form-control"
-                   value="{{ u.nom }}" maxlength="150" required>
+          <div class="row">
+            <div class="col-sm-6 mb-3">
+              <label class="form-label small fw-semibold" for="usr-nom-{{ u.id }}">Nom complet</label>
+              <input type="text" id="usr-nom-{{ u.id }}" name="nom" class="form-control"
+                     value="{{ u.nom }}" maxlength="150" required>
+            </div>
+            <div class="col-sm-6 mb-3">
+              <label class="form-label small fw-semibold">Identifiant</label>
+              <input type="text" class="form-control" value="{{ u.identifiant }}" disabled>
+              <div class="form-text">Non modifiable après la création du compte.</div>
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">Identifiant</label>
-            <input type="text" class="form-control" value="{{ u.identifiant }}" disabled>
-            <div class="form-text">L'identifiant n'est pas modifiable après la création du compte.</div>
+          <div class="row">
+            <div class="col-sm-6 mb-3">
+              <label class="form-label small fw-semibold" for="usr-role-{{ u.id }}">Rôle</label>
+              <select class="form-select js-role" id="usr-role-{{ u.id }}" name="role" required
+                      {% if u.identifiant == current_user.identifiant %}disabled{% endif %}>
+                <option {% if u.role == 'Gestionnaire de stock' %}selected{% endif %}>Gestionnaire de stock</option>
+                <option {% if u.role == 'Comptable' %}selected{% endif %}>Comptable</option>
+                <option {% if u.role == 'Administrateur' %}selected{% endif %}>Administrateur</option>
+              </select>
+              {% if u.identifiant == current_user.identifiant %}
+              <input type="hidden" name="role" value="{{ u.role }}">
+              <div class="form-text">Vous ne pouvez pas modifier votre propre rôle.</div>
+              {% endif %}
+            </div>
+            <div class="col-sm-6 mb-3">
+              <label class="form-label small fw-semibold" for="usr-actif-{{ u.id }}">Statut</label>
+              <select class="form-select" id="usr-actif-{{ u.id }}" name="actif"
+                      {% if u.identifiant == current_user.identifiant %}disabled{% endif %}>
+                <option value="1" {% if u.statut == 'Actif' %}selected{% endif %}>Actif</option>
+                <option value="0" {% if u.statut == 'Désactivé' %}selected{% endif %}>Désactivé</option>
+              </select>
+              {% if u.identifiant == current_user.identifiant %}
+              <input type="hidden" name="actif" value="1">
+              <div class="form-text">Vous ne pouvez pas modifier le statut de votre propre compte.</div>
+              {% endif %}
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold" for="usr-role-{{ u.id }}">Rôle</label>
-            <select class="form-select js-role" id="usr-role-{{ u.id }}" name="role" required
-                    {% if u.identifiant == current_user.identifiant %}disabled{% endif %}>
-              <option {% if u.role == 'Gestionnaire de stock' %}selected{% endif %}>Gestionnaire de stock</option>
-              <option {% if u.role == 'Comptable' %}selected{% endif %}>Comptable</option>
-              <option {% if u.role == 'Administrateur' %}selected{% endif %}>Administrateur</option>
-            </select>
-            {% if u.identifiant == current_user.identifiant %}
-            <input type="hidden" name="role" value="{{ u.role }}">
-            <div class="form-text">Vous ne pouvez pas modifier votre propre rôle.</div>
-            {% endif %}
-          </div>
-          <div class="mb-3 js-magasin-groupe">
+          <div class="mb-1 js-magasin-groupe">
             <label class="form-label small fw-semibold" for="usr-magasin-{{ u.id }}">Magasin de rattachement</label>
             <select class="form-select js-magasin" id="usr-magasin-{{ u.id }}" name="magasin_id">
               <option value="">Sélectionner un magasin</option>
@@ -142,18 +158,6 @@
               Obligatoire pour un Gestionnaire de stock. Sans objet pour un Comptable ou un
               Administrateur (accès à tous les magasins) : le rattachement sera vidé.
             </div>
-          </div>
-          <div class="mb-1">
-            <label class="form-label small fw-semibold" for="usr-actif-{{ u.id }}">Statut</label>
-            <select class="form-select" id="usr-actif-{{ u.id }}" name="actif"
-                    {% if u.identifiant == current_user.identifiant %}disabled{% endif %}>
-              <option value="1" {% if u.statut == 'Actif' %}selected{% endif %}>Actif</option>
-              <option value="0" {% if u.statut == 'Désactivé' %}selected{% endif %}>Désactivé</option>
-            </select>
-            {% if u.identifiant == current_user.identifiant %}
-            <input type="hidden" name="actif" value="1">
-            <div class="form-text">Vous ne pouvez pas modifier le statut de votre propre compte.</div>
-            {% endif %}
           </div>
         </div>
         <div class="modal-footer">
@@ -181,16 +185,18 @@
             Compte <strong>{{ u.identifiant }}</strong> ({{ u.nom }}). Définissez un nouveau mot de passe et
             communiquez-le à l'utilisateur : il prendra effet à sa prochaine connexion.
           </p>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold" for="pwd-new-{{ u.id }}">Nouveau mot de passe</label>
-            <input type="password" id="pwd-new-{{ u.id }}" name="mot_de_passe" class="form-control"
-                   autocomplete="new-password" minlength="8" data-pwd-original data-pwd-strength required>
-            <div class="pwd-strength"><div class="pwd-strength-bar"></div></div>
-          </div>
-          <div class="mb-1">
-            <label class="form-label small fw-semibold" for="pwd-conf-{{ u.id }}">Confirmation</label>
-            <input type="password" id="pwd-conf-{{ u.id }}" name="mot_de_passe_confirmation" class="form-control"
-                   autocomplete="new-password" minlength="8" data-pwd-confirm required>
+          <div class="row">
+            <div class="col-sm-6 mb-1">
+              <label class="form-label small fw-semibold" for="pwd-new-{{ u.id }}">Nouveau mot de passe</label>
+              <input type="password" id="pwd-new-{{ u.id }}" name="mot_de_passe" class="form-control"
+                     autocomplete="new-password" minlength="8" data-pwd-original data-pwd-strength required>
+              <div class="pwd-strength"><div class="pwd-strength-bar"></div></div>
+            </div>
+            <div class="col-sm-6 mb-1">
+              <label class="form-label small fw-semibold" for="pwd-conf-{{ u.id }}">Confirmation</label>
+              <input type="password" id="pwd-conf-{{ u.id }}" name="mot_de_passe_confirmation" class="form-control"
+                     autocomplete="new-password" minlength="8" data-pwd-confirm required>
+            </div>
           </div>
           <p class="text-muted small mb-0 mt-2">8 caractères minimum.</p>
         </div>

@@ -70,18 +70,20 @@
       <h6 class="mb-3"><i class="bi bi-plus-circle text-primary"></i> Ajouter un magasin</h6>
       <form action="{{ url_for('creer_magasin') }}" method="post" data-validate novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Nom</label>
-          <input type="text" name="nom" class="form-control" placeholder="ex : Magasin Douala-Port" required>
-        </div>
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Adresse</label>
-          <input type="text" name="adresse" class="form-control" placeholder="Adresse ou zone (optionnel)">
+        <div class="row">
+          <div class="col-sm-6 mb-2">
+            <label class="form-label small fw-semibold">Nom</label>
+            <input type="text" name="nom" class="form-control" placeholder="ex : Magasin Douala-Port" required>
+          </div>
+          <div class="col-sm-6 mb-2">
+            <label class="form-label small fw-semibold">E-mail d'alerte</label>
+            <input type="email" name="email_alertes" class="form-control" placeholder="stock.magasin@exemple.fr (optionnel)">
+          </div>
         </div>
         <div class="mb-3">
-          <label class="form-label small fw-semibold">E-mail d'alerte</label>
-          <input type="email" name="email_alertes" class="form-control" placeholder="stock.magasin@exemple.fr (optionnel)">
-          <div class="form-text">Destinataire des alertes de seuil des articles de ce magasin.</div>
+          <label class="form-label small fw-semibold">Adresse</label>
+          <input type="text" name="adresse" class="form-control" placeholder="Adresse ou zone (optionnel)">
+          <div class="form-text">L'e-mail reçoit les alertes de seuil des articles de ce magasin.</div>
         </div>
         <button type="submit" class="btn btn-primary w-100 fw-semibold">Ajouter</button>
       </form>
@@ -101,21 +103,23 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
         </div>
         <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label small fw-semibold" for="mag-nom-{{ m.magasin.id }}">Nom</label>
-            <input type="text" id="mag-nom-{{ m.magasin.id }}" name="nom" class="form-control"
-                   value="{{ m.magasin.nom }}" maxlength="150" required>
+          <div class="row">
+            <div class="col-sm-6 mb-3">
+              <label class="form-label small fw-semibold" for="mag-nom-{{ m.magasin.id }}">Nom</label>
+              <input type="text" id="mag-nom-{{ m.magasin.id }}" name="nom" class="form-control"
+                     value="{{ m.magasin.nom }}" maxlength="150" required>
+            </div>
+            <div class="col-sm-6 mb-3">
+              <label class="form-label small fw-semibold" for="mag-mail-{{ m.magasin.id }}">E-mail d'alerte</label>
+              <input type="email" id="mag-mail-{{ m.magasin.id }}" name="email_alertes" class="form-control"
+                     value="{{ m.magasin.email_alertes or '' }}" placeholder="Aucune — alerte journalisée">
+            </div>
           </div>
-          <div class="mb-3">
+          <div class="mb-1">
             <label class="form-label small fw-semibold" for="mag-adr-{{ m.magasin.id }}">Adresse</label>
             <input type="text" id="mag-adr-{{ m.magasin.id }}" name="adresse" class="form-control"
                    value="{{ m.magasin.adresse or '' }}" placeholder="Adresse ou zone (optionnel)">
-          </div>
-          <div class="mb-1">
-            <label class="form-label small fw-semibold" for="mag-mail-{{ m.magasin.id }}">E-mail d'alerte</label>
-            <input type="email" id="mag-mail-{{ m.magasin.id }}" name="email_alertes" class="form-control"
-                   value="{{ m.magasin.email_alertes or '' }}" placeholder="Aucune — alerte journalisée">
-            <div class="form-text">Destinataire des alertes de seuil des articles de ce magasin.</div>
+            <div class="form-text">L'e-mail reçoit les alertes de seuil des articles de ce magasin.</div>
           </div>
         </div>
         <div class="modal-footer">

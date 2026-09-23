@@ -45,13 +45,15 @@
       <h6 class="mb-3"><i class="bi bi-plus-circle text-primary"></i> Ajouter un fournisseur</h6>
       <form action="{{ url_for('creer_fournisseur') }}" method="post" data-validate novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Nom</label>
-          <input type="text" name="nom" class="form-control" placeholder="ex : Papeterie Générale SARL" required>
-        </div>
-        <div class="mb-3">
-          <label class="form-label small fw-semibold">Contact</label>
-          <input type="text" name="contact" class="form-control" placeholder="Téléphone ou e-mail (optionnel)">
+        <div class="row">
+          <div class="col-sm-6 mb-3">
+            <label class="form-label small fw-semibold">Nom</label>
+            <input type="text" name="nom" class="form-control" placeholder="ex : Papeterie Générale SARL" required>
+          </div>
+          <div class="col-sm-6 mb-3">
+            <label class="form-label small fw-semibold">Contact</label>
+            <input type="text" name="contact" class="form-control" placeholder="Téléphone ou e-mail (optionnel)">
+          </div>
         </div>
         <button type="submit" class="btn btn-primary w-100 fw-semibold">Ajouter</button>
       </form>

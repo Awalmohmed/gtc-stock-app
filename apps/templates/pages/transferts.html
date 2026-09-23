@@ -24,9 +24,14 @@
 
 {% block content %}
 
+{# col-12 : une seule carte sur cette ligne (pas de colonne sœur) — la
+   laisser en col-md-6 la coincerait à moitié de la largeur de l'écran,
+   avec la moitié droite vide, et forcerait les paires de champs internes
+   (Quantité/Date, voir plus bas) à repasser en 1 colonne bien avant que
+   la largeur réelle disponible ne le justifie. #}
 <div class="row g-3">
   <!-- Formulaire Transfert -->
-  <div class="col-md-6">
+  <div class="col-12">
     <div class="card table-card p-3 h-100">
       <h6 class="mb-3"><i class="bi bi-arrow-left-right text-primary"></i> Nouveau transfert</h6>
 
@@ -36,31 +41,33 @@
       <form action="{{ url_for('creer_transfert') }}" method="post" data-validate novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Magasin source</label>
-          {% if est_admin %}
-          <select class="form-select" id="trf-magasin-source" name="magasin_source_id" required>
-            <option value="" selected disabled>Sélectionner le magasin source</option>
-            {% for m in magasins %}
-            <option value="{{ m.id }}">{{ m.nom }}</option>
-            {% endfor %}
-          </select>
-          {% elif magasin_source_impose %}
-          <input type="text" class="form-control" value="{{ magasin_source_nom }}" disabled>
-          <div class="form-text">Votre magasin de rattachement — non modifiable.</div>
-          {% else %}
-          <p class="text-danger small mb-0">Aucun magasin ne vous est rattaché : contactez un administrateur.</p>
-          {% endif %}
-        </div>
+        <div class="row">
+          <div class="col-12 col-sm-6 mb-2">
+            <label class="form-label small fw-semibold">Magasin source</label>
+            {% if est_admin %}
+            <select class="form-select" id="trf-magasin-source" name="magasin_source_id" required>
+              <option value="" selected disabled>Sélectionner le magasin source</option>
+              {% for m in magasins %}
+              <option value="{{ m.id }}">{{ m.nom }}</option>
+              {% endfor %}
+            </select>
+            {% elif magasin_source_impose %}
+            <input type="text" class="form-control" value="{{ magasin_source_nom }}" disabled>
+            <div class="form-text">Votre magasin de rattachement — non modifiable.</div>
+            {% else %}
+            <p class="text-danger small mb-0">Aucun magasin ne vous est rattaché : contactez un administrateur.</p>
+            {% endif %}
+          </div>
 
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Magasin destination</label>
-          <select class="form-select" id="trf-magasin-destination" name="magasin_destination_id" required>
-            <option value="" selected disabled>Sélectionner le magasin destination</option>
-            {% for m in magasins %}
-            <option value="{{ m.id }}">{{ m.nom }}</option>
-            {% endfor %}
-          </select>
+          <div class="col-12 col-sm-6 mb-2">
+            <label class="form-label small fw-semibold">Magasin destination</label>
+            <select class="form-select" id="trf-magasin-destination" name="magasin_destination_id" required>
+              <option value="" selected disabled>Sélectionner le magasin destination</option>
+              {% for m in magasins %}
+              <option value="{{ m.id }}">{{ m.nom }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
 
         <div class="mb-2">
