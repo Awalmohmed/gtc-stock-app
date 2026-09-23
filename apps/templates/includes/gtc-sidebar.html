@@ -45,6 +45,9 @@
     <a class="nav-link {% if 'rapprochement' in segment %}active{% endif %}" href="{{ url_for('pages_rapprochement') }}">
       <i class="bi bi-check2-circle me-2"></i> Rapprochement
     </a>
+    <a class="nav-link {% if 'analyse_articles' in segment %}active{% endif %}" href="{{ url_for('pages_analyse_articles') }}">
+      <i class="bi bi-graph-up me-2"></i> Analyse des articles
+    </a>
     <a class="nav-link {% if 'alertes' in segment %}active{% endif %}" href="{{ url_for('pages_alertes') }}">
       <i class="bi bi-bell me-2"></i> Alertes
     </a>

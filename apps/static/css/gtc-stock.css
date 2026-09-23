@@ -255,3 +255,58 @@ body {
 .bg-info-subtle     { background-color: #e3f3fb !important; }
 .bg-dark-subtle     { background-color: #dde1e8 !important; }
 .bg-secondary-subtle{ background-color: #ebedf0 !important; }
+
+/* ---------- Analyse des articles : graphique en anneau (voir
+   pages/analyse_articles.html) ----------
+   Palette catégorielle validée CVD-safe (voir la skill dataviz interne,
+   references/palette.md) — jamais recolorée dynamiquement : chaque
+   teinte reste associée à un RANG (1er, 2e article vendu...), jamais à
+   un article précis, qui peut changer d'une période à l'autre (c'est le
+   tableau/légende qui porte le nom à chaque fois, l'identité n'est
+   jamais portée par la seule couleur). --donut-c6 (gris neutre, hors
+   palette catégorielle) est réservé au segment "Autres articles" : ce
+   n'est pas une identité mais un total résiduel agrégé. */
+.analyse-donut {
+  --donut-c1: #2a78d6;
+  --donut-c2: #eb6834;
+  --donut-c3: #1baf7a;
+  --donut-c4: #eda100;
+  --donut-c5: #e87ba4;
+  --donut-c6: #9a988f;
+}
+.donut-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 240px;
+  margin: 0 auto;
+}
+.donut-wrap svg { width: 100%; height: auto; display: block; }
+.donut-segment {
+  transition: opacity .15s ease, filter .15s ease;
+  cursor: pointer;
+}
+.donut-segment:hover,
+.donut-segment:focus-visible {
+  filter: brightness(1.08);
+  outline: none;
+}
+.donut-segment.is-dimmed { opacity: .35; }
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.donut-center .valeur { font-size: 1.5rem; font-weight: 700; color: var(--gtc-navy); line-height: 1.1; }
+.donut-center .libelle { font-size: .7rem; color: #6c7280; max-width: 8rem; }
+.donut-legend-table tbody tr.is-active { background: #f5f7fb; }
+.donut-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}

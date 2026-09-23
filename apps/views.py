@@ -565,6 +565,21 @@ def export_rapprochement_excel():
   return Response(contenu, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                    headers={'Content-Disposition': 'attachment; filename="rapprochement.xlsx"'})
 
+@app.route('/pages/analyse-articles/')
+@login_required
+def pages_analyse_articles():
+  # Périmètre magasin déjà géré par get_analyse_articles (via
+  # _filtrer_articles) — même règle que toutes les autres pages
+  # métier : Gestionnaire de stock limité à son magasin, Comptable/
+  # Administrateur voient tous les magasins ou celui choisi dans le
+  # sélecteur de la barre supérieure (injecter_selecteur_magasin).
+  periode = request.args.get('periode', '30')
+  if periode not in PERIODES_ANALYSE:
+    periode = '30'
+  analyse = get_analyse_articles(periode)
+  return render_template('pages/analyse_articles.html', segment='analyse_articles', parent='pages',
+                          periode=periode, **analyse)
+
 @app.route('/pages/alertes/')
 @login_required
 def pages_alertes():

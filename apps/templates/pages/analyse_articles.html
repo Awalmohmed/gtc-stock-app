@@ -1,0 +1,169 @@
+{#
+  Analyse des articles — route pages_analyse_articles (GET /pages/analyse-articles/),
+  tout rôle connecté (Gestionnaire de stock limité à son magasin, Comptable/
+  Administrateur tous magasins ou celui choisi dans le sélecteur de la barre
+  supérieure — même périmètre que les autres pages, voir gtc_data._filtrer_articles).
+  Reçoit (gtc_data.get_analyse_articles) : top_ventes (au plus 10 articles,
+  quantité sortie décroissante, avec pourcentage), donut (segments du
+  graphique en anneau — 5 articles + "Autres articles" au besoin, jamais
+  plus de 6 parts), dormants (tous les articles sans sortie sur la
+  période, quantité en stock décroissante), date_debut (None si "depuis
+  le début"), total_quantite_vendue, periode (clé courante du sélecteur,
+  voir PERIODES_ANALYSE).
+
+  La quantité "sortie" additionne TOUTES les sorties de la période
+  (mouvement de sortie ET régularisation) — voir le docstring de
+  get_analyse_articles pour le détail. Sélecteur de période en GET
+  (?periode=...), auto-soumis comme le sélecteur de magasin de la topbar —
+  pas de formulaire de mutation, donc pas de csrf_token ici.
+
+  Graphique en anneau (donut) : un <circle> par segment, dessiné en
+  stroke-dasharray/-dashoffset (pas de librairie JS) — voir le calcul de
+  la longueur d'arc ci-dessous et la mise en forme dans gtc-stock.css
+  (.analyse-donut). Le tableau à droite du graphique sert À LA FOIS de
+  légende (couleur <-> article) ET de vue tabulaire des valeurs : aucune
+  donnée n'est accessible uniquement au survol. Couleurs = palette
+  catégorielle validée CVD-safe (voir gtc-stock.css, .analyse-donut) ;
+  jamais recolorée selon l'article (juste selon son RANG dans le
+  classement de la période affichée) : une teinte identifie "le plus
+  vendu de la période", pas un article précis, qui peut changer d'une
+  période à l'autre — c'est le tableau qui porte le nom à chaque fois.
+#}
+{% extends 'layouts/gtc-base.html' %}
+
+{% block title %}GTC Stock - Analyse des articles{% endblock title %}
+{% block page_title %}Analyse des articles{% endblock page_title %}
+
+{% block content %}
+
+<div class="card table-card p-3 mb-3">
+  <form method="get" class="d-flex align-items-center flex-wrap gap-2">
+    <label class="form-label small fw-semibold mb-0" for="periode-select">Période</label>
+    <select class="form-select form-select-sm" id="periode-select" name="periode"
+            style="width:auto;" onchange="this.form.submit()">
+      <option value="7" {% if periode == '7' %}selected{% endif %}>7 derniers jours</option>
+      <option value="30" {% if periode == '30' %}selected{% endif %}>30 derniers jours</option>
+      <option value="90" {% if periode == '90' %}selected{% endif %}>90 derniers jours</option>
+      <option value="tout" {% if periode == 'tout' %}selected{% endif %}>Depuis le début</option>
+    </select>
+    <span class="text-muted small">
+      {% if date_debut %}
+      Sorties comptabilisées depuis le {{ date_debut.strftime('%d/%m/%Y') }}.
+      {% else %}
+      Sorties comptabilisées depuis le tout premier mouvement enregistré.
+      {% endif %}
+    </span>
+  </form>
+</div>
+
+<div class="card table-card p-3 mb-3 analyse-donut">
+  <h6 class="mb-3"><i class="bi bi-graph-up-arrow text-success"></i> Articles les plus vendus</h6>
+
+  {% if donut %}
+  <div class="row g-4 align-items-center">
+    <div class="col-12 col-md-5">
+      <div class="donut-wrap">
+        {% set r = 80 %}
+        {% set epaisseur = 32 %}
+        {% set circonference = 2 * 3.14159265 * r %}
+        {% set espace = 3 %}
+        <svg viewBox="0 0 220 220" role="img" aria-label="Répartition des ventes par article sur la période">
+          <g transform="rotate(-90 110 110)">
+            {% set ns = namespace(decalage=0) %}
+            {% for seg in donut %}
+            {% set fraction = (seg.quantite_sortie / total_quantite_vendue) if total_quantite_vendue else 0 %}
+            {% set longueur = fraction * circonference %}
+            <circle class="donut-segment" data-donut-index="{{ loop.index0 }}"
+                    cx="110" cy="110" r="{{ r }}" fill="none"
+                    stroke="var(--donut-c{{ loop.index }})"
+                    stroke-width="{{ epaisseur }}"
+                    stroke-dasharray="{{ [longueur - espace, 0] | max }} {{ circonference }}"
+                    stroke-dashoffset="{{ -ns.decalage }}"
+                    tabindex="0" role="img"
+                    aria-label="{{ seg.nom }} : {{ seg.pourcentage }} pour cent, {{ seg.quantite_sortie }} unités">
+              <title>{{ seg.nom }} — {{ seg.pourcentage }}% ({{ seg.quantite_sortie }} unité(s))</title>
+            </circle>
+            {% set ns.decalage = ns.decalage + longueur %}
+            {% endfor %}
+          </g>
+        </svg>
+        <div class="donut-center">
+          <span class="valeur">{{ total_quantite_vendue }}</span>
+          <span class="libelle">unité(s) vendue(s) sur la période</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-7">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0 donut-legend-table">
+          <thead class="text-muted small">
+            <tr>
+              <th></th>
+              <th>Article</th>
+              <th class="text-end">Quantité sortie</th>
+              <th class="text-end">Part des ventes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for seg in donut %}
+            <tr data-donut-legende-ligne="{{ loop.index0 }}">
+              <td>
+                <span class="donut-legend-swatch" style="background: var(--donut-c{{ loop.index }});"></span>
+              </td>
+              <td>
+                {{ seg.nom }}
+                {% if seg.reference %}<div class="small text-muted">{{ seg.reference }}</div>{% endif %}
+              </td>
+              <td class="text-end fw-semibold">{{ seg.quantite_sortie }}</td>
+              <td class="text-end">{{ seg.pourcentage }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if top_ventes|length > 5 %}
+      <p class="text-muted small mt-2 mb-0">
+        "Autres articles" regroupe les {{ top_ventes|length - 5 }} article(s) suivant(s) du classement
+        (et au-delà) ; le détail complet reste dans l'export de la fiche de stock de chaque article.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <p class="text-muted text-center mb-0">Aucune sortie enregistrée sur cette période.</p>
+  {% endif %}
+</div>
+
+<div class="card table-card p-3">
+  <h6 class="mb-3"><i class="bi bi-hourglass-split text-warning"></i> Articles dormants</h6>
+  <p class="text-muted small">
+    Aucune sortie sur la période — surstocks potentiels à surveiller, triés par quantité en stock décroissante.
+  </p>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead class="text-muted small">
+        <tr>
+          <th>Article</th>
+          <th>Référence</th>
+          <th class="text-end">Qté en stock</th>
+          <th>Dernier mouvement</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in dormants %}
+        <tr>
+          <td>{{ l.article.nom }}</td>
+          <td class="text-muted">{{ l.article.reference }}</td>
+          <td class="text-end fw-semibold">{{ l.article.quantite }}</td>
+          <td class="text-muted">{{ l.article.dernier_mouvement or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted text-center">Aucun article dormant sur cette période.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock content %}

@@ -9,10 +9,10 @@ revanche stockés dans une vraie base SQLite via SQLAlchemy (voir
 apps/models.py et apps/config.py).
 """
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from flask import session
-from sqlalchemy import false as sa_false, or_ as sa_or
+from sqlalchemy import false as sa_false, func as sa_func, or_ as sa_or
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -561,6 +561,104 @@ def get_historique(article_id):
         ligne["solde"] = solde
         solde -= ligne["quantite_brute"] if ligne["type"] == "Entrée" else -ligne["quantite_brute"]
     return lignes
+
+
+# Périodes proposées par le sélecteur de la page Analyse des articles (voir
+# pages_analyse_articles) : nombre de jours, ou None pour "depuis le début"
+# (aucune borne basse). Valeur par défaut : 30 jours.
+PERIODES_ANALYSE = {
+    "7": 7,
+    "30": 30,
+    "90": 90,
+    "tout": None,
+}
+
+
+def get_analyse_articles(periode="30"):
+    """Analyse des ventes (sorties) par article du périmètre magasin
+    courant (voir _filtrer_articles — un Gestionnaire de stock ne voit
+    que son magasin, un Comptable/Administrateur tous les magasins ou
+    celui choisi dans le sélecteur de la barre supérieure), pour la page
+    Analyse des articles : fait ressortir les articles qui se vendent le
+    plus et ceux qui dorment en stock.
+
+    `periode` : une clé de PERIODES_ANALYSE ("7", "30", "90", "tout") ;
+    retombe sur 30 jours si la valeur est inconnue. La quantité "sortie"
+    additionne TOUTES les sorties de la période (mouvement de sortie ET
+    régularisation, voir apps.models.TYPES_SORTIE) : une régularisation
+    négative reste, du point de vue du stock physique, une sortie réelle.
+
+    Retourne un dict :
+      - top_ventes : au plus 10 articles ayant eu au moins une sortie sur
+        la période, triés par quantité sortie décroissante, chacun avec
+        son "pourcentage" (part de la quantité totale vendue, tous
+        articles confondus — pas seulement le top 10) ;
+      - donut : les segments du graphique en anneau de la page — les 5
+        articles les plus vendus, puis un segment "Autres articles"
+        agrégeant le reste des ventes s'il y en a (jamais plus de 6
+        segments, repère de lisibilité usuel pour ce type de graphique) ;
+      - dormants : TOUS les articles du périmètre sans aucune sortie sur
+        la période, triés par quantité en stock décroissante — les plus
+        gros surstocks à surveiller en tête ;
+      - date_debut : date de début de la période (None si "depuis le
+        début"), pour l'affichage dans le sous-titre de la page ;
+      - total_quantite_vendue : quantité totale sortie sur la période,
+        tous articles du périmètre confondus (dénominateur des %)."""
+    periode_jours = PERIODES_ANALYSE.get(periode, 30)
+    date_debut = date.today() - timedelta(days=periode_jours) if periode_jours is not None else None
+
+    articles = get_all_articles()
+    quantites_sorties = {a.id: 0 for a in articles}
+    if articles:
+        requete = Sortie.query.filter(Sortie.article_id.in_(quantites_sorties.keys()))
+        if date_debut is not None:
+            requete = requete.filter(Sortie.date >= date_debut)
+        totaux = (
+            requete.with_entities(Sortie.article_id, sa_func.sum(Sortie.quantite))
+            .group_by(Sortie.article_id)
+            .all()
+        )
+        for article_id, total in totaux:
+            quantites_sorties[article_id] = total or 0
+
+    lignes = [{"article": a, "quantite_sortie": quantites_sorties[a.id]} for a in articles]
+    total_quantite_vendue = sum(l["quantite_sortie"] for l in lignes)
+
+    def _pourcentage(quantite):
+        return round(quantite / total_quantite_vendue * 100) if total_quantite_vendue else 0
+
+    top_ventes = sorted(
+        (l for l in lignes if l["quantite_sortie"] > 0),
+        key=lambda l: l["quantite_sortie"], reverse=True,
+    )[:10]
+    for l in top_ventes:
+        l["pourcentage"] = _pourcentage(l["quantite_sortie"])
+
+    donut = [
+        {
+            "nom": l["article"].nom, "reference": l["article"].reference,
+            "quantite_sortie": l["quantite_sortie"], "pourcentage": l["pourcentage"],
+        }
+        for l in top_ventes[:5]
+    ]
+    reste = total_quantite_vendue - sum(l["quantite_sortie"] for l in top_ventes[:5])
+    if reste > 0:
+        donut.append({
+            "nom": "Autres articles", "reference": None,
+            "quantite_sortie": reste, "pourcentage": _pourcentage(reste),
+        })
+
+    dormants = sorted(
+        (l for l in lignes if l["quantite_sortie"] == 0),
+        key=lambda l: l["article"].quantite, reverse=True,
+    )
+    return {
+        "top_ventes": top_ventes,
+        "donut": donut,
+        "dormants": dormants,
+        "date_debut": date_debut,
+        "total_quantite_vendue": total_quantite_vendue,
+    }
 
 
 def get_all_fournisseurs():
