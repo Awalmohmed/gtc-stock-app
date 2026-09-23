@@ -74,7 +74,18 @@
         <!-- Nom/rôle masqué sous md (768px) : l'avatar reste comme repère
              d'identité, le texte revient dès qu'il y a la place. -->
         <span class="text-muted small d-none d-md-inline">{{ current_user.nom }} — {{ current_user.role }}</span>
-        <div class="bg-secondary rounded-circle flex-shrink-0" style="width:36px;height:36px;"></div>
+        <!-- Avatar cliquable : ouvre includes/photo-profil-modal.html
+             (chaque utilisateur ne peut changer QUE sa propre photo, voir
+             apps/avatars.py). -->
+        <button type="button" class="avatar-btn flex-shrink-0" data-bs-toggle="modal"
+                data-bs-target="#modalPhotoProfil" aria-label="Modifier ma photo de profil"
+                title="Modifier ma photo de profil">
+          {% if current_user.photo %}
+          <img src="{{ url_for('static', filename=current_user.photo) }}" alt="">
+          {% else %}
+          <span class="avatar-initiale">{{ (current_user.nom or '?')[:1]|upper }}</span>
+          {% endif %}
+        </button>
         <a href="{{ url_for('accounts_logout') }}" class="btn btn-sm btn-outline-secondary ms-2"
            aria-label="Déconnexion">
           <i class="bi bi-box-arrow-right"></i> <span class="d-none d-md-inline">Déconnexion</span>
@@ -94,6 +105,10 @@
     </div>
   </div>
 </div>
+
+{% if current_user %}
+{% include 'includes/photo-profil-modal.html' %}
+{% endif %}
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/dist/js/bootstrap.min.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/js/gtc-stock.js') }}"></script>

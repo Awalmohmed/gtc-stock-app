@@ -14,6 +14,7 @@ from urllib.parse import urlparse, urljoin
 from flask import session, redirect, url_for, flash, request
 
 from apps import app
+from apps.gtc_data import get_user_by_identifiant
 
 
 def is_safe_next_url(target):
@@ -43,13 +44,21 @@ def _current_full_path():
 
 
 def current_user():
-    """Infos de session de l'utilisateur connecté, ou None si visiteur."""
+    """Infos de l'utilisateur connecté, ou None si visiteur.
+
+    nom/role viennent de la session (posés à la connexion) ; id/photo sont
+    relus en base à chaque requête (via `identifiant`) plutôt que mis en
+    session, pour qu'un changement de photo de profil (voir apps/avatars.py)
+    soit visible immédiatement, sans devoir se reconnecter."""
     if 'identifiant' not in session:
         return None
+    utilisateur = get_user_by_identifiant(session['identifiant'])
     return {
+        'id': utilisateur.id if utilisateur else None,
         'identifiant': session['identifiant'],
         'nom': session.get('nom'),
         'role': session.get('role'),
+        'photo': utilisateur.photo if utilisateur else None,
     }
 
 

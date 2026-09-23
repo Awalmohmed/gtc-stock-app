@@ -1,0 +1,47 @@
+{#
+  Modale « Ma photo de profil » — ouverte depuis l'avatar de la topbar
+  (voir layouts/gtc-base.html). Change TOUJOURS la photo de l'utilisateur
+  CONNECTÉ, jamais celle d'un autre compte (voir apps/avatars.py) : pas de
+  paramètre d'utilisateur ciblé, contrairement aux modales d'admin de
+  pages/utilisateurs.html. `retour` (l'URL de la page courante) ramène ici
+  après traitement, même logique que le sélecteur de magasin de la topbar.
+#}
+<div class="modal fade" id="modalPhotoProfil" tabindex="-1" aria-labelledby="titrePhotoProfil" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="titrePhotoProfil">Ma photo de profil</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body text-center">
+        {% if current_user and current_user.photo %}
+        <img src="{{ url_for('static', filename=current_user.photo) }}" alt="Photo de profil actuelle"
+             class="rounded-circle mb-3" style="width:120px;height:120px;object-fit:cover;">
+        {% else %}
+        <div class="avatar-initiale rounded-circle mx-auto mb-3">
+          {{ (current_user.nom if current_user and current_user.nom else '?')[:1]|upper }}
+        </div>
+        {% endif %}
+
+        <form action="{{ url_for('modifier_photo_profil') }}" method="post" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="retour" value="{{ request.full_path }}">
+          <input type="file" name="photo" accept="image/png,image/jpeg,image/gif,image/webp"
+                 class="form-control mb-2" required>
+          <div class="form-text mb-3">JPG, PNG, GIF ou WEBP — 2 Mo maximum.</div>
+          <button type="submit" class="btn btn-primary w-100">Enregistrer la nouvelle photo</button>
+        </form>
+
+        {% if current_user and current_user.photo %}
+        <form action="{{ url_for('supprimer_photo_profil') }}" method="post" class="mt-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="retour" value="{{ request.full_path }}">
+          <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+            <i class="bi bi-trash3"></i> Revenir à l'avatar par défaut
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>

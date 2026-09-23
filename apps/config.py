@@ -86,3 +86,15 @@ class Config(object):
     # d'adresse d'alerte propre.
     ALERTE_EMAIL_EXPEDITEUR = os.getenv('ALERTE_EMAIL_EXPEDITEUR', 'alertes-stock@gtc.local')
     ALERTE_EMAIL_DEFAUT = os.getenv('ALERTE_EMAIL_DEFAUT')
+
+    # Photos de profil (voir apps/avatars.py) — enregistrées directement
+    # dans le dossier static, servies comme n'importe quel autre asset.
+    # Surchargeable via AVATARS_UPLOAD_DIR pour pointer vers un volume
+    # persistant en production (ex. Render/Docker, comme DATABASE_URL
+    # ci-dessus) : dans une image reconstruite à chaque déploiement, un
+    # fichier écrit sous apps/static/ SANS volume ne survit pas au
+    # prochain déploiement.
+    AVATARS_UPLOAD_DIR = os.getenv(
+        'AVATARS_UPLOAD_DIR',
+        os.path.join(basedir, 'static', 'uploads', 'avatars')
+    )

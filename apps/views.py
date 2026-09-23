@@ -26,6 +26,7 @@ from apps.models import ROLE_CLASSES, Magasin, ROLES_TOUS_MAGASINS
 from apps.auth import login_required, admin_required, roles_required, is_safe_next_url
 from apps.rate_limit import secondes_avant_deblocage, enregistrer_echec, reinitialiser
 from apps.import_articles import importer_fichier, modele_csv, FichierInvalide
+from apps.avatars import enregistrer_photo, supprimer_photo
 from apps import exports
 
 # App main route -- redirige vers le tableau de bord GTC Stock
@@ -63,6 +64,44 @@ def definir_magasin_filtre():
   retour = request.form.get('retour')
   if not is_safe_next_url(retour):
     retour = url_for('pages_dashboard')
+  return redirect(retour)
+
+
+@app.route('/accounts/photo/', methods=['POST'])
+@login_required
+def modifier_photo_profil():
+  """Change la photo de profil DE L'UTILISATEUR CONNECTÉ — jamais celle
+  d'un autre compte, même pour un Administrateur (voir apps/avatars.py).
+  Formulaire dans includes/gtc-sidebar-photo-modal.html, inclus par
+  gtc-base.html donc accessible depuis n'importe quelle page connectée ;
+  `retour` ramène sur cette même page après traitement."""
+  utilisateur = get_user_by_identifiant(session['identifiant'])
+  retour = request.form.get('retour')
+  if not is_safe_next_url(retour):
+    retour = url_for('pages_dashboard')
+  if utilisateur is None:
+    flash("Session invalide, merci de vous reconnecter.", "danger")
+    return redirect(url_for('accounts_sign_in'))
+  try:
+    enregistrer_photo(utilisateur, request.files.get('photo'))
+  except ValueError as e:
+    flash(str(e), "danger")
+  else:
+    flash("Photo de profil mise à jour.", "success")
+  return redirect(retour)
+
+
+@app.route('/accounts/photo/supprimer/', methods=['POST'])
+@login_required
+def supprimer_photo_profil():
+  """Revient à l'avatar par défaut pour l'utilisateur connecté."""
+  utilisateur = get_user_by_identifiant(session['identifiant'])
+  retour = request.form.get('retour')
+  if not is_safe_next_url(retour):
+    retour = url_for('pages_dashboard')
+  if utilisateur is not None:
+    supprimer_photo(utilisateur)
+    flash("Photo de profil supprimée.", "info")
   return redirect(retour)
 
 # Pages -- Dashboard

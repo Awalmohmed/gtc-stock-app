@@ -60,6 +60,11 @@ class Utilisateur(db.Model):
     # Magasin de rattachement — utile seulement pour "Gestionnaire de
     # stock" (voir ROLES_TOUS_MAGASINS) ; NULL pour Administrateur/Comptable.
     magasin_id = db.Column(db.Integer, db.ForeignKey("magasins.id"), nullable=True)
+    # Photo de profil : chemin relatif à apps/static/ (ex.
+    # "uploads/avatars/3.jpg"), voir apps/avatars.py pour l'upload/la
+    # validation. NULL -> avatar par défaut (cercle gris avec initiale)
+    # affiché par les templates.
+    photo = db.Column(db.String(255), nullable=True)
 
     magasin = db.relationship("Magasin", backref="utilisateurs")
 

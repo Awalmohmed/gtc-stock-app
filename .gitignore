@@ -14,6 +14,10 @@ __pycache__/
 # secrets locaux (SMTP, SECRET_KEY, ...) — jamais commités
 .env
 
+# photos de profil envoyées par les utilisateurs (voir apps/avatars.py) —
+# contenu généré à l'exécution, jamais commité
+apps/static/uploads/
+
 # venv
 env
 venv
