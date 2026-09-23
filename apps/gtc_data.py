@@ -264,17 +264,13 @@ def _recalculer_statut(article):
 # ---------------------------------------------------------------------
 # Rapprochement automatique avec Sage 100
 #
-# Données de démonstration, utilisées tant que la connexion Sage 100 en
-# base réelle (voir apps/sage_connector.py) n'est pas configurée — voir
-# get_rapprochement() ci-dessous, appelée par la page /pages/rapprochement/.
+# Tant que la connexion Sage 100 en base réelle (voir apps/sage_connector.py)
+# n'est pas configurée, get_rapprochement() (ci-dessous, appelée par la page
+# /pages/rapprochement/) retombe sur RAPPROCHEMENT — laissée vide (plus de
+# données de démonstration) : la page affiche alors qu'aucun rapprochement
+# n'est disponible plutôt que des écarts fictifs.
 # ---------------------------------------------------------------------
-RAPPROCHEMENT = [
-    {"article": "Rame de papier A4", "qte_app": 5, "qte_sage": 5, "ecart": 0, "conforme": True},
-    {"article": "Classeur A4", "qte_app": 8, "qte_sage": 11, "ecart": -3, "conforme": False},
-    {"article": "Cartouche imprimante", "qte_app": 50, "qte_sage": 50, "ecart": 0, "conforme": True},
-    {"article": "Stylo bille bleu (boîte)", "qte_app": 96, "qte_sage": 90, "ecart": 6, "conforme": False},
-    {"article": "Chaise bureau (modèle X)", "qte_app": 14, "qte_sage": 14, "ecart": 0, "conforme": True},
-]
+RAPPROCHEMENT = []
 
 # ---------------------------------------------------------------------
 # Alertes (écarts de rapprochement + seuils critiques) : voir la classe
