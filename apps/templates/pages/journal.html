@@ -62,7 +62,7 @@
      aria-labelledby="titreExporterViderJournal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="post">
+      <form method="post" id="form-exporter-vider-journal">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title" id="titreExporterViderJournal">Exporter et vider le journal</h5>
@@ -98,3 +98,53 @@
 {% endif %}
 
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+  // La réponse de succès de ce formulaire EST le fichier exporté
+  // (Content-Disposition: attachment) : soumis normalement, le
+  // navigateur télécharge bien le fichier mais NE NAVIGUE PAS —  la
+  // page (tableau + message flash) reste donc affichée telle quelle,
+  // masquant que le vidage a pourtant déjà eu lieu côté serveur (voir
+  // views._exporter_et_vider_journal, qui garantit déjà l'ordre
+  // export-puis-vidage et les messages d'erreur : la seule chose qui
+  // manquait ici est de rafraîchir l'écran une fois l'action terminée).
+  // On intercepte donc la soumission : fetch (redirect: 'manual' pour
+  // ne PAS laisser fetch elle-même consommer le message flash d'une
+  // éventuelle redirection d'erreur), déclenche le téléchargement à la
+  // main si la réponse est bien un fichier, puis recharge la page dans
+  // tous les cas pour afficher l'état à jour (tableau vidé + message).
+  var formExportVider = document.getElementById('form-exporter-vider-journal');
+  if (formExportVider) {
+    formExportVider.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var bouton = event.submitter;
+      var url = bouton && bouton.formAction ? bouton.formAction : formExportVider.action;
+      var donnees = new FormData(formExportVider);
+
+      fetch(url, { method: 'POST', body: donnees, credentials: 'same-origin', redirect: 'manual' })
+        .then(function (reponse) {
+          var typeContenu = reponse.headers.get('Content-Type') || '';
+          var estUnFichier = typeContenu.indexOf('application/pdf') === 0
+            || typeContenu.indexOf('spreadsheetml') !== -1;
+          if (!estUnFichier) return; // erreur -> redirection non suivie, le flash reste en session
+          return reponse.blob().then(function (blob) {
+            var entete = reponse.headers.get('Content-Disposition') || '';
+            var correspondance = entete.match(/filename="?([^"]+)"?/);
+            var nomFichier = correspondance ? correspondance[1] : 'export';
+            var urlObjet = URL.createObjectURL(blob);
+            var lien = document.createElement('a');
+            lien.href = urlObjet;
+            lien.download = nomFichier;
+            document.body.appendChild(lien);
+            lien.click();
+            lien.remove();
+            URL.revokeObjectURL(urlObjet);
+          });
+        })
+        .catch(function () { /* erreur réseau : le rechargement ci-dessous affichera l'état réel */ })
+        .finally(function () { window.location.reload(); });
+    });
+  }
+</script>
+{% endblock extra_js %}
