@@ -1,0 +1,33 @@
+{#
+  Composant "recherche de fournisseur" (autocomplétion / type-ahead) —
+  même principe que includes/article-picker.html, pour le champ
+  Fournisseur (obligatoire) d'un article : pages/fiche_stock.html (création)
+  et pages/articles.html (modification). Suggestions via la route JSON
+  /pages/fournisseurs/recherche (gtc_data.rechercher_fournisseurs), limitée
+  à 10 résultats. Animé par static/assets/js/gtc-stock.js, section 9.
+
+  Variables Jinja attendues avant l'include (via {% set %}) :
+    - fournisseur_picker_id : identifiant HTML unique du composant sur la
+      page (plusieurs formulaires peuvent coexister, ex. une modale par
+      article dans pages/articles.html).
+    - fournisseur_picker_valeur_initiale (optionnel) : id du fournisseur
+      déjà rattaché — pré-remplit le champ cible en modification.
+    - fournisseur_picker_texte_initial (optionnel) : son nom, affiché tel
+      quel au chargement (évite un aller-retour réseau juste pour
+      réafficher la sélection courante).
+
+  Résultat transmis au formulaire : un champ caché name="fournisseur_id",
+  comme le faisait le <select> qu'il remplace — aucun changement côté
+  serveur (gtc_data.add_article / maj_article).
+#}
+<div class="position-relative" data-fournisseur-picker>
+  <input type="text" class="form-control" id="{{ fournisseur_picker_id }}-texte"
+         data-fournisseur-picker-input autocomplete="off" required
+         value="{{ fournisseur_picker_texte_initial or '' }}"
+         placeholder="Rechercher un fournisseur…">
+  <input type="hidden" name="fournisseur_id" data-fournisseur-picker-value
+         value="{{ fournisseur_picker_valeur_initiale or '' }}">
+  <div class="list-group position-absolute w-100 shadow-sm"
+       style="z-index:1055; display:none; max-height:260px; overflow-y:auto;"
+       data-fournisseur-picker-suggestions></div>
+</div>

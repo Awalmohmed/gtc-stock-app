@@ -358,8 +358,17 @@ def rechercher_articles(terme, magasin_id=None):
     motif = f"%{terme}%"
     query = query.filter(sa_or(Article.reference.ilike(motif), Article.nom.ilike(motif)))
     articles = query.order_by(Article.nom).limit(10).all()
+    # fournisseur_id/fournisseur_nom : transmis pour que le formulaire de
+    # réception fournisseur (entrees.html) affiche/valide en une seule
+    # requête le fournisseur rattaché à l'article choisi, sans aller-retour
+    # réseau supplémentaire (voir static/assets/js/gtc-stock.js, section 5,
+    # et le blocage correspondant côté serveur dans add_entree).
     return [
-        {"id": a.id, "nom": a.nom, "reference": a.reference, "quantite": a.quantite}
+        {
+            "id": a.id, "nom": a.nom, "reference": a.reference, "quantite": a.quantite,
+            "fournisseur_id": a.fournisseur_id,
+            "fournisseur_nom": a.fournisseur.nom if a.fournisseur else None,
+        }
         for a in articles
     ]
 
@@ -498,6 +507,12 @@ def _mouvement_vers_dict(mouvement, type_libelle, signe):
         ligne["numero_vehicule"] = mouvement.numero_vehicule
         ligne["nom_chauffeur"] = mouvement.nom_chauffeur
         ligne["num_bordereau_reception"] = mouvement.num_bordereau_reception
+        # Fournisseur de CE mouvement (copié sur Entree.fournisseur_id au
+        # moment de la réception — voir add_entree) : reste correct même si
+        # le fournisseur habituel de l'article change ensuite. "—" au lieu
+        # de None pour les quelques réceptions historiques enregistrées
+        # avant l'ajout de ce champ (fournisseur_id resté NULL).
+        ligne["fournisseur"] = mouvement.fournisseur.nom if mouvement.fournisseur else "—"
     elif type_entree:
         ligne["sous_type"] = mouvement.type_entree_libelle
         ligne["sous_type_classe"] = mouvement.type_entree_classe
@@ -553,6 +568,28 @@ def get_all_fournisseurs():
     return Fournisseur.query.order_by(Fournisseur.nom).all()
 
 
+def rechercher_fournisseurs(terme):
+    """Fournisseurs dont le nom OU le contact contient `terme` (insensible
+    à la casse), limité à 10 résultats — pour l'autocomplétion (type-ahead)
+    du champ Fournisseur d'un article (voir la route
+    pages_fournisseurs_recherche), même principe que rechercher_articles.
+    Pas de filtrage par magasin : un fournisseur n'est pas rattaché à un
+    magasin en particulier."""
+    terme = (terme or "").strip()
+    if not terme:
+        return []
+
+    motif = f"%{terme}%"
+    fournisseurs = (
+        Fournisseur.query
+        .filter(sa_or(Fournisseur.nom.ilike(motif), Fournisseur.contact.ilike(motif)))
+        .order_by(Fournisseur.nom)
+        .limit(10)
+        .all()
+    )
+    return [{"id": f.id, "nom": f.nom, "contact": f.contact} for f in fournisseurs]
+
+
 def add_fournisseur(nom, contact):
     """Crée un nouveau fournisseur en base. Lève ValueError si ce nom
     existe déjà (y compris en cas de double soumission quasi simultanée :
@@ -583,6 +620,15 @@ def add_article(nom, reference, seuil, quantite, fournisseur_id=None, magasin_id
     dans un autre magasin — voir Article.__table_args__), ou si le
     fournisseur / le magasin indiqué est introuvable.
 
+    Le fournisseur est désormais OBLIGATOIRE (voir Article.fournisseur_id) :
+    une réception fournisseur (add_entree) le dérive automatiquement de
+    l'article plutôt que de le faire ressaisir à chaque mouvement — il n'y
+    a donc plus de moment où « pas de fournisseur » serait rattrapable
+    ailleurs. Les articles créés avant ce changement peuvent rester sans
+    fournisseur (colonne restée nullable en base, pour ne pas casser les
+    données existantes) ; add_entree bloque alors leur réception tant que
+    la fiche n'a pas été complétée (voir son message d'erreur dédié).
+
     Le statut initial est déduit de la quantité vs le seuil (même règle
     que _recalculer_statut) ; l'article démarre sans dernier mouvement."""
     nom = (nom or "").strip()
@@ -602,18 +648,18 @@ def add_article(nom, reference, seuil, quantite, fournisseur_id=None, magasin_id
     if not magasin_id or db.session.get(Magasin, magasin_id) is None:
         raise ValueError("Merci d'indiquer le magasin de rattachement de l'article.")
 
-    fournisseur = None
-    if fournisseur_id:
-        fournisseur = db.session.get(Fournisseur, fournisseur_id)
-        if fournisseur is None:
-            raise ValueError("Fournisseur introuvable.")
+    if not fournisseur_id:
+        raise ValueError("Merci de sélectionner le fournisseur habituel de l'article.")
+    fournisseur = db.session.get(Fournisseur, fournisseur_id)
+    if fournisseur is None:
+        raise ValueError("Fournisseur introuvable.")
 
     if Article.query.filter_by(reference=reference, magasin_id=magasin_id).first():
         raise ValueError(f"La référence « {reference} » existe déjà dans ce magasin.")
 
     article = Article(
         nom=nom, reference=reference, seuil=seuil, quantite=quantite,
-        fournisseur_id=fournisseur.id if fournisseur else None,
+        fournisseur_id=fournisseur.id,
         magasin_id=magasin_id,
         statut="Alerte" if quantite <= seuil else "OK",
         dernier_mouvement="—",
@@ -643,7 +689,8 @@ def maj_article(article_id, nom, seuil, fournisseur_id=None,
     L'article est résolu via get_article() : un Gestionnaire de stock ne
     peut pas modifier un article hors de son magasin (ValueError « Article
     introuvable »). Lève aussi ValueError si la désignation est vide/trop
-    longue, si le seuil est négatif, si le fournisseur / le magasin
+    longue, si le seuil est négatif, si le fournisseur est absent ou
+    introuvable (désormais obligatoire — voir add_article), si le magasin
     indiqué est introuvable, ou si sa référence existe déjà dans le
     magasin de destination choisi (la référence n'étant unique QUE par
     magasin — voir Article.__table_args__ — déplacer un article peut
@@ -660,8 +707,9 @@ def maj_article(article_id, nom, seuil, fournisseur_id=None,
     if seuil is None or seuil < 0:
         raise ValueError("Le seuil d'alerte doit être un entier positif ou nul.")
 
-    fournisseur_id = fournisseur_id or None
-    if fournisseur_id and db.session.get(Fournisseur, fournisseur_id) is None:
+    if not fournisseur_id:
+        raise ValueError("Merci de sélectionner le fournisseur habituel de l'article.")
+    if db.session.get(Fournisseur, fournisseur_id) is None:
         raise ValueError("Fournisseur introuvable.")
 
     if peut_changer_magasin:
@@ -772,20 +820,22 @@ def _article_mouvementable(article_id):
 
 
 def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *,
-                magasin_id=None, fournisseur_id=None, reference=None, motif=None,
+                magasin_id=None, reference=None, motif=None,
                 numero_vehicule=None, nom_chauffeur=None, num_bon_livraison_fournisseur=None,
                 num_bordereau_reception=None):
     """Enregistre une entrée de stock et met à jour l'article. `type_entree`
     (voir TYPES_ENTREE) détermine quels champs — tous passés en mots-clés,
     seuls certains sont exigés selon le type — sont réellement utilisés :
       - "reception_fournisseur" : magasin_id (le magasin concerné par la
-        réception — doit être celui de l'article), fournisseur_id (un
-        fournisseur valide), numero_vehicule, nom_chauffeur,
-        num_bon_livraison_fournisseur ET num_bordereau_reception — tous
-        obligatoires : une vraie réception physique a un véhicule, un
-        chauffeur, et DEUX documents distincts (le bon de livraison,
-        émis par le fournisseur, et le bordereau de réception, établi en
-        interne — jamais l'un pour l'autre) ;
+        réception — doit être celui de l'article), numero_vehicule,
+        nom_chauffeur, num_bon_livraison_fournisseur ET
+        num_bordereau_reception — tous obligatoires : une vraie réception
+        physique a un véhicule, un chauffeur, et DEUX documents distincts
+        (le bon de livraison, émis par le fournisseur, et le bordereau de
+        réception, établi en interne — jamais l'un pour l'autre). Le
+        fournisseur N'EST PLUS un paramètre : il est repris automatiquement
+        d'Article.fournisseur_id (aucun choix/saisie à ce niveau) — voir
+        ValueError dédiée ci-dessous si l'article n'en a pas ;
       - "retour_client" : reference (nom/référence du client) ; motif
         (motif du retour) reste facultatif ;
       - "regularisation" : motif obligatoire, réservée aux rôles
@@ -794,9 +844,10 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *
 
     Lève ValueError si l'article est introuvable, si `type_entree` est
     invalide, si un champ obligatoire pour ce type manque, si l'article
-    n'appartient pas au magasin indiqué (réception), si le rôle de
-    `utilisateur` n'autorise pas une régularisation, ou si la quantité
-    est invalide."""
+    n'appartient pas au magasin indiqué (réception), si l'article n'a pas
+    de fournisseur rattaché (réception — message invitant à compléter sa
+    fiche d'abord), si le rôle de `utilisateur` n'autorise pas une
+    régularisation, ou si la quantité est invalide."""
     article = _article_mouvementable(article_id)
     if quantite <= 0:
         raise ValueError("La quantité doit être supérieure à zéro.")
@@ -809,16 +860,19 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *
     nom_chauffeur = (nom_chauffeur or "").strip() or None
     num_bon_livraison_fournisseur = (num_bon_livraison_fournisseur or "").strip() or None
     num_bordereau_reception = (num_bordereau_reception or "").strip() or None
-    fournisseur = None
+    fournisseur_id = None
 
     if type_entree == "reception_fournisseur":
         if not magasin_id:
             raise ValueError("Merci d'indiquer le magasin concerné par la réception.")
         if article.magasin_id != magasin_id:
             raise ValueError("L'article sélectionné n'appartient pas au magasin concerné par la réception.")
-        fournisseur = db.session.get(Fournisseur, fournisseur_id) if fournisseur_id else None
-        if not fournisseur:
-            raise ValueError("Merci de sélectionner un fournisseur.")
+        if not article.fournisseur_id:
+            raise ValueError(
+                f"« {article.nom} » n'a pas de fournisseur rattaché : complétez d'abord sa fiche "
+                "(page Articles) avant d'enregistrer une réception."
+            )
+        fournisseur_id = article.fournisseur_id
         if not numero_vehicule:
             raise ValueError("Merci d'indiquer le numéro du véhicule de livraison.")
         if not nom_chauffeur:
@@ -848,7 +902,7 @@ def add_entree(article_id, date_mouvement, quantite, type_entree, utilisateur, *
     entree = Entree(
         article_id=article.id, date=date_mouvement, quantite=quantite,
         type_entree=type_entree,
-        fournisseur_id=fournisseur.id if fournisseur else None,
+        fournisseur_id=fournisseur_id,
         reference=reference, motif=motif,
         numero_vehicule=numero_vehicule, nom_chauffeur=nom_chauffeur,
         num_bon_livraison_fournisseur=num_bon_livraison_fournisseur,

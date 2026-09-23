@@ -1,7 +1,7 @@
 {#
   Catalogue des articles — route pages_articles (GET /pages/articles/), tout rôle connecté.
   ?archives=1 (Administrateur seulement) -> vue « articles archivés ».
-  Reçoit : articles, vue_archives, nb_archives, fournisseurs, magasins.
+  Reçoit : articles, vue_archives, nb_archives, magasins.
   Sections : 1) barre d'outils (bascule actifs/archivés + recherche live) ;
   2) tableau des articles (colonne Actions selon le rôle) ;
   3) modales par article : modifier (POST modifier_article) / archiver
@@ -171,7 +171,7 @@
 {% for a in articles %}
 <div class="modal fade" id="modalModifierArticle{{ a.id }}" tabindex="-1"
      aria-labelledby="titreModifierArticle{{ a.id }}" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <form action="{{ url_for('modifier_article', article_id=a.id) }}" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -192,35 +192,38 @@
               <div class="form-text">Évolue uniquement via les entrées / sorties.</div>
             </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold" for="art-nom-{{ a.id }}">Désignation</label>
-            <input type="text" id="art-nom-{{ a.id }}" name="nom" class="form-control"
-                   value="{{ a.nom }}" maxlength="150" required>
+          <div class="row">
+            <div class="col-sm-8 mb-3">
+              <label class="form-label small fw-semibold" for="art-nom-{{ a.id }}">Désignation</label>
+              <input type="text" id="art-nom-{{ a.id }}" name="nom" class="form-control"
+                     value="{{ a.nom }}" maxlength="150" required>
+            </div>
+            <div class="col-sm-4 mb-3">
+              <label class="form-label small fw-semibold" for="art-seuil-{{ a.id }}">Seuil d'alerte</label>
+              <input type="number" id="art-seuil-{{ a.id }}" name="seuil" class="form-control"
+                     value="{{ a.seuil }}" min="0" required>
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold" for="art-seuil-{{ a.id }}">Seuil d'alerte</label>
-            <input type="number" id="art-seuil-{{ a.id }}" name="seuil" class="form-control"
-                   value="{{ a.seuil }}" min="0" required>
+          <div class="row">
+            <div class="{{ 'col-sm-6' if est_admin else 'col-12' }} mb-1">
+              <label class="form-label small fw-semibold" for="art-fournisseur-{{ a.id }}-texte">Fournisseur habituel</label>
+              {% set fournisseur_picker_id = 'art-fournisseur-' ~ a.id %}
+              {% set fournisseur_picker_valeur_initiale = a.fournisseur_id %}
+              {% set fournisseur_picker_texte_initial = a.fournisseur.nom if a.fournisseur else none %}
+              {% include 'includes/fournisseur-picker.html' %}
+            </div>
+            {% if est_admin %}
+            <div class="col-sm-6 mb-1">
+              <label class="form-label small fw-semibold" for="art-magasin-{{ a.id }}">Magasin de rattachement</label>
+              <select class="form-select" id="art-magasin-{{ a.id }}" name="magasin_id" required>
+                {% for m in magasins %}
+                <option value="{{ m.id }}" {% if a.magasin_id == m.id %}selected{% endif %}>{{ m.nom }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold" for="art-fournisseur-{{ a.id }}">Fournisseur habituel</label>
-            <select class="form-select" id="art-fournisseur-{{ a.id }}" name="fournisseur_id">
-              <option value="">— Aucun —</option>
-              {% for f in fournisseurs %}
-              <option value="{{ f.id }}" {% if a.fournisseur_id == f.id %}selected{% endif %}>{{ f.nom }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% if est_admin %}
-          <div class="mb-1">
-            <label class="form-label small fw-semibold" for="art-magasin-{{ a.id }}">Magasin de rattachement</label>
-            <select class="form-select" id="art-magasin-{{ a.id }}" name="magasin_id" required>
-              {% for m in magasins %}
-              <option value="{{ m.id }}" {% if a.magasin_id == m.id %}selected{% endif %}>{{ m.nom }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% endif %}
+          <div class="form-text mt-1">Toute réception sur cet article reprendra automatiquement ce fournisseur.</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>

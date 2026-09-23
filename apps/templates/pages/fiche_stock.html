@@ -1,7 +1,7 @@
 {#
   Fiches de stock — route pages_fiche_stock (GET /pages/fiche-stock/?article=<id>),
   tout rôle connecté. Reçoit : articles, article (celui ciblé ou le 1er),
-  historique (get_historique, avec solde après chaque mouvement), fournisseurs, magasins.
+  historique (get_historique, avec solde après chaque mouvement), magasins.
   Sections : 1) liste d'articles à gauche ; 2) fiche détaillée à droite
   (3 compteurs + historique + exports PDF/Excel) ; 3) modale « Nouvel article »
   -> POST creer_article. Le champ « Magasin de rattachement » n'apparaît que
@@ -124,6 +124,9 @@
               </td>
               <td>
                 {{ h.detail }}
+                {% if h.fournisseur %}
+                <div class="small text-muted">Fournisseur : {{ h.fournisseur }}</div>
+                {% endif %}
                 {% if h.num_bordereau_reception %}
                 <div class="small text-muted">Bordereau {{ h.num_bordereau_reception }}</div>
                 {% endif %}
@@ -133,6 +136,19 @@
                   {%- if h.numero_vehicule and h.nom_chauffeur %} — {% endif -%}
                   {%- if h.nom_chauffeur %}{{ h.nom_chauffeur }}{% endif -%}
                 </div>
+                {% endif %}
+                {% if h.bordereau_destination %}
+                <div class="small text-muted">
+                  {{ h.bordereau_magasin_expedition }} → {{ h.bordereau_destination }}
+                  ({{ h.bordereau_client_destinataire }})
+                </div>
+                <div class="small text-muted">
+                  Véhicule {{ h.bordereau_numero_vehicule }} — {{ h.bordereau_nom_chauffeur }}
+                  {% if h.bordereau_numero_facture %} — Facture {{ h.bordereau_numero_facture }}{% endif %}
+                </div>
+                {% if h.observation %}
+                <div class="small text-muted">Observation : {{ h.observation }}</div>
+                {% endif %}
                 {% endif %}
               </td>
               <td>{{ h.quantite }}</td>
@@ -157,7 +173,7 @@
 
 {% if peut_gerer %}
 <div class="modal fade" id="modalNouvelArticle" tabindex="-1" aria-labelledby="titreNouvelArticle" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <form action="{{ url_for('creer_article') }}" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -166,47 +182,51 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
         </div>
         <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label small fw-semibold" for="art-nom">Désignation</label>
-            <input type="text" id="art-nom" name="nom" class="form-control" maxlength="150"
-                   placeholder="ex : riz sana ind" required>
-          </div>
           <div class="row">
-            <div class="col-sm-6 mb-3">
+            <div class="col-sm-8 mb-3">
+              <label class="form-label small fw-semibold" for="art-nom">Désignation</label>
+              <input type="text" id="art-nom" name="nom" class="form-control" maxlength="150"
+                     placeholder="ex : riz sana ind" required>
+            </div>
+            <div class="col-sm-4 mb-3">
               <label class="form-label small fw-semibold" for="art-ref">Référence</label>
               <input type="text" id="art-ref" name="reference" class="form-control" maxlength="50"
                      placeholder="ex : REF-0135" required>
-              <div class="form-text">Doit être unique dans le magasin de rattachement (peut exister dans un autre magasin).</div>
+              <div class="form-text">Unique dans le magasin de rattachement.</div>
             </div>
-            <div class="col-sm-3 col-6 mb-3">
+          </div>
+          <div class="row">
+            <div class="col-sm-6 col-6 mb-3">
               <label class="form-label small fw-semibold" for="art-seuil">Seuil d'alerte</label>
               <input type="number" id="art-seuil" name="seuil" class="form-control" min="0" value="0" required>
             </div>
-            <div class="col-sm-3 col-6 mb-3">
+            <div class="col-sm-6 col-6 mb-3">
               <label class="form-label small fw-semibold" for="art-qte">Quantité initiale</label>
               <input type="number" id="art-qte" name="quantite" class="form-control" min="0" value="0" required>
             </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold" for="art-fournisseur">Fournisseur associé (optionnel)</label>
-            <select class="form-select" id="art-fournisseur" name="fournisseur_id">
-              <option value="" selected>— Aucun —</option>
-              {% for f in fournisseurs %}
-              <option value="{{ f.id }}">{{ f.nom }}</option>
-              {% endfor %}
-            </select>
+          <div class="row">
+            <div class="{{ 'col-sm-6' if current_user.role == 'Administrateur' else 'col-12' }} mb-1">
+              <label class="form-label small fw-semibold" for="art-fournisseur-texte">Fournisseur habituel</label>
+              {% set fournisseur_picker_id = 'art-fournisseur' %}
+              {% include 'includes/fournisseur-picker.html' %}
+            </div>
+            {% if current_user.role == 'Administrateur' %}
+            <div class="col-sm-6 mb-1">
+              <label class="form-label small fw-semibold" for="art-magasin">Magasin de rattachement</label>
+              <select class="form-select" id="art-magasin" name="magasin_id" required>
+                <option value="" selected disabled>Sélectionner un magasin</option>
+                {% for m in magasins %}
+                <option value="{{ m.id }}">{{ m.nom }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
           </div>
-          {% if current_user.role == 'Administrateur' %}
-          <div class="mb-1">
-            <label class="form-label small fw-semibold" for="art-magasin">Magasin de rattachement</label>
-            <select class="form-select" id="art-magasin" name="magasin_id" required>
-              <option value="" selected disabled>Sélectionner un magasin</option>
-              {% for m in magasins %}
-              <option value="{{ m.id }}">{{ m.nom }}</option>
-              {% endfor %}
-            </select>
+          <div class="form-text mt-1">
+            Toute réception sur cet article reprendra automatiquement ce fournisseur.
+            <a href="{{ url_for('pages_fournisseurs') }}">Gérer les fournisseurs</a>
           </div>
-          {% endif %}
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>

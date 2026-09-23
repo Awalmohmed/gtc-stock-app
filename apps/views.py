@@ -14,7 +14,8 @@ from apps import app, db
 from apps.gtc_data import (
   get_stats, get_all_articles, get_article, get_historique, get_entrees, get_sorties,
   add_entree, add_sortie, get_all_users, get_rapprochement,
-  get_all_fournisseurs, add_fournisseur, get_journal, vider_journal, get_alertes, traiter_alerte,
+  get_all_fournisseurs, add_fournisseur, rechercher_fournisseurs, get_journal, vider_journal,
+  get_alertes, traiter_alerte,
   get_all_magasins, get_magasins_detailles, add_magasin, maj_magasin_email,
   maj_magasin, add_article, maj_article, archiver_article, desarchiver_article,
   supprimer_definitivement_article, get_articles_archives, rechercher_articles,
@@ -124,13 +125,16 @@ def pages_entrees():
   # Gestionnaire de stock voit son propre magasin, imposé, sans sélecteur
   # — magasin_reception_nom le lui affiche : `current_user` (injecté par
   # apps/auth.py) n'est qu'un dict identifiant/nom/rôle, sans relation
-  # magasin, d'où ce calcul ici plutôt que dans le template).
+  # magasin, d'où ce calcul ici plutôt que dans le template). Plus de
+  # `fournisseurs` ici : le fournisseur d'une réception est désormais
+  # dérivé automatiquement de l'article choisi (voir add_entree), plus de
+  # champ à alimenter dans ce formulaire.
   utilisateur = get_user_by_identifiant(session.get('identifiant'))
   magasin_reception_nom = (
     utilisateur.magasin.nom if utilisateur and utilisateur.magasin else None
   )
   return render_template('pages/entrees.html', segment='entrees', parent='pages',
-                          mouvements=get_entrees(), fournisseurs=get_all_fournisseurs(),
+                          mouvements=get_entrees(),
                           magasins=get_all_magasins(), magasin_reception_nom=magasin_reception_nom)
 
 @app.route('/pages/sorties/')
@@ -165,7 +169,6 @@ def creer_entree():
     # source de vérité sur ce qui est obligatoire pour chacun.
     type_entree = request.form.get('type_entree') or ''
     magasin_id = None
-    fournisseur_id = None
     reference = motif = numero_vehicule = nom_chauffeur = None
     num_bon_livraison_fournisseur = num_bordereau_reception = None
 
@@ -174,12 +177,14 @@ def creer_entree():
       # (Administrateur, Comptable — voir ROLES_TOUS_MAGASINS), imposé
       # (son propre magasin) pour un Gestionnaire de stock — même
       # précaution que pour magasin_source_id (transferer_stock) : jamais
-      # pris tel quel dans le formulaire pour ce dernier.
+      # pris tel quel dans le formulaire pour ce dernier. Pas de
+      # fournisseur_id ici : add_entree le reprend automatiquement depuis
+      # l'article choisi (voir Article.fournisseur_id) — il n'y a plus de
+      # champ fournisseur dans ce formulaire.
       if session.get('role') in ROLES_TOUS_MAGASINS:
         magasin_id = request.form.get('magasin_id', type=int)
       else:
         magasin_id = utilisateur.magasin_id if utilisateur else None
-      fournisseur_id = request.form.get('fournisseur_id', type=int)
       numero_vehicule = request.form.get('numero_vehicule')
       nom_chauffeur = request.form.get('nom_chauffeur')
       num_bon_livraison_fournisseur = request.form.get('num_bon_livraison_fournisseur')
@@ -194,7 +199,7 @@ def creer_entree():
 
     add_entree(
       article_id, date_mouvement, quantite, type_entree, utilisateur,
-      magasin_id=magasin_id, fournisseur_id=fournisseur_id, reference=reference, motif=motif,
+      magasin_id=magasin_id, reference=reference, motif=motif,
       numero_vehicule=numero_vehicule, nom_chauffeur=nom_chauffeur,
       num_bon_livraison_fournisseur=num_bon_livraison_fournisseur,
       num_bordereau_reception=num_bordereau_reception,
@@ -255,6 +260,17 @@ def pages_articles_recherche():
   terme = request.args.get('q') or ''
   magasin_id = request.args.get('magasin_id', type=int)
   return jsonify(rechercher_articles(terme, magasin_id))
+
+@app.route('/pages/fournisseurs/recherche')
+@login_required
+def pages_fournisseurs_recherche():
+  """Autocomplétion (type-ahead) du champ Fournisseur habituel d'un article
+  (voir includes/fournisseur-picker.html, pages/fiche_stock.html et
+  pages/articles.html) : au plus 10 résultats JSON correspondant à `q`
+  (nom ou contact), jamais le catalogue entier (voir
+  gtc_data.rechercher_fournisseurs)."""
+  terme = request.args.get('q') or ''
+  return jsonify(rechercher_fournisseurs(terme))
 
 @app.route('/pages/transferts/')
 @roles_required('Gestionnaire de stock', 'Administrateur')
@@ -318,7 +334,7 @@ def pages_fiche_stock():
   historique = get_historique(article.id) if article else []
   return render_template('pages/fiche_stock.html', segment='fiche_stock', parent='pages',
                           articles=articles, article=article, historique=historique,
-                          fournisseurs=get_all_fournisseurs(), magasins=get_all_magasins())
+                          magasins=get_all_magasins())
 
 @app.route('/pages/fiche-stock/nouveau', methods=['POST'])
 @roles_required('Gestionnaire de stock', 'Administrateur')
@@ -358,7 +374,7 @@ def pages_articles():
   return render_template('pages/articles.html', segment='articles', parent='pages',
                           articles=archives if vue_archives else get_all_articles(),
                           vue_archives=vue_archives, nb_archives=len(archives),
-                          fournisseurs=get_all_fournisseurs(), magasins=get_all_magasins())
+                          magasins=get_all_magasins())
 
 @app.route('/pages/articles/<int:article_id>/modifier', methods=['POST'])
 @roles_required('Gestionnaire de stock', 'Administrateur')

@@ -1,6 +1,6 @@
 {#
   Entrées de stock — route pages_entrees (GET /pages/entrees/), tout rôle
-  connecté. Reçoit : mouvements (get_entrees), fournisseurs, magasins.
+  connecté. Reçoit : mouvements (get_entrees), magasins.
   Sections : 1) formulaire « Nouvelle entrée » -> POST creer_entree ;
   2) tableau des entrées enregistrées (récent -> ancien).
 
@@ -18,14 +18,19 @@
   champ masqué mais pas désactivé serait quand même soumis, y compris un
   article_id d'un autre bloc).
 
-  Réception fournisseur : en plus du fournisseur, le magasin concerné
-  par la réception est libre pour un rôle qui voit tous les magasins
-  (Administrateur, Comptable — voir ROLES_TOUS_MAGASINS), imposé pour
-  un Gestionnaire de stock (son propre magasin, non modifiable). La
-  recherche d'article de CE bloc est restreinte à ce magasin
-  (data-magasin-source-input, même mécanisme que le formulaire de
-  Transfert) — pour un Gestionnaire, pas de sélecteur : son magasin
-  s'applique automatiquement côté serveur, comme pour les 2 autres types.
+  Réception fournisseur : le magasin concerné par la réception est libre
+  pour un rôle qui voit tous les magasins (Administrateur, Comptable —
+  voir ROLES_TOUS_MAGASINS), imposé pour un Gestionnaire de stock (son
+  propre magasin, non modifiable). La recherche d'article de CE bloc est
+  restreinte à ce magasin (data-magasin-source-input, même mécanisme que
+  le formulaire de Transfert) — pour un Gestionnaire, pas de sélecteur :
+  son magasin s'applique automatiquement côté serveur, comme pour les 2
+  autres types. Pas de champ Fournisseur à saisir : une fois l'article
+  choisi, son fournisseur habituel (Article.fournisseur_id) s'affiche en
+  lecture seule (article_picker_fournisseur_cible, voir
+  includes/article-picker.html et gtc-stock.js section 5) — bloqué tant
+  que l'article n'en a pas (message invitant à compléter sa fiche
+  d'abord), vérification qui compte côté serveur dans add_entree.
 
   « Régularisation » n'est proposée qu'à un Administrateur ou un
   Gestionnaire de stock (voir ROLES_REGULARISATION) — la vérification
@@ -42,31 +47,35 @@
 
 {% block content %}
 
+{# col-12 : une seule carte sur cette ligne (pas de colonne sœur) — la
+   laisser en col-md-6 la coincerait à moitié de la largeur de l'écran,
+   avec la moitié droite vide, et forcerait les paires de champs internes
+   (Quantité/Date, etc., voir plus bas) à repasser en 1 colonne bien avant
+   que la largeur réelle disponible ne le justifie. #}
 <div class="row g-3">
   <!-- Formulaire Entrée -->
-  <div class="col-md-6">
+  <div class="col-12">
     <div class="card table-card p-3 h-100">
       <h6 class="mb-3"><i class="bi bi-box-arrow-in-down text-success"></i> Nouvelle entrée</h6>
       <form action="{{ url_for('creer_entree') }}" method="post" data-validate novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <div class="mb-2">
-          <label class="form-label small fw-semibold">Type d'entrée</label>
-          <select class="form-select" name="type_entree" data-type-toggle-select required>
-            <option value="reception_fournisseur" selected>Réception fournisseur</option>
-            <option value="retour_client">Retour client</option>
-            {% if current_user and current_user.role in ['Administrateur', 'Gestionnaire de stock'] %}
-            <option value="regularisation">Régularisation</option>
-            {% endif %}
-          </select>
-        </div>
-
         <div class="row">
-          <div class="col-12 col-sm-6 mb-2">
+          <div class="col-12 col-sm-6 col-lg-4 mb-2">
+            <label class="form-label small fw-semibold">Type d'entrée</label>
+            <select class="form-select" name="type_entree" data-type-toggle-select required>
+              <option value="reception_fournisseur" selected>Réception fournisseur</option>
+              <option value="retour_client">Retour client</option>
+              {% if current_user and current_user.role in ['Administrateur', 'Gestionnaire de stock'] %}
+              <option value="regularisation">Régularisation</option>
+              {% endif %}
+            </select>
+          </div>
+          <div class="col-12 col-sm-6 col-lg-4 mb-2">
             <label class="form-label small fw-semibold">Quantité</label>
             <input type="number" name="quantite" min="1" class="form-control" placeholder="0" required>
           </div>
-          <div class="col-12 col-sm-6 mb-2">
+          <div class="col-12 col-sm-6 col-lg-4 mb-2">
             <label class="form-label small fw-semibold">Date</label>
             <input type="date" name="date" class="form-control" required>
           </div>
@@ -74,45 +83,44 @@
 
         <!-- Réception fournisseur -->
         <div data-type-toggle-groupe="reception_fournisseur">
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Fournisseur</label>
-            <select class="form-select" name="fournisseur_id" data-type-toggle-champ required>
-              <option value="" selected disabled>Sélectionner un fournisseur</option>
-              {% for f in fournisseurs %}
-              <option value="{{ f.id }}">{{ f.nom }}</option>
+          <div class="row">
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Magasin concerné par la réception</label>
+              {% if current_user and current_user.role in ['Administrateur', 'Comptable'] %}
+              <select class="form-select" name="magasin_id" id="entree-reception-magasin"
+                      data-type-toggle-champ required>
+                <option value="" selected disabled>Sélectionner un magasin</option>
+                {% for m in magasins %}
+                <option value="{{ m.id }}">{{ m.nom }}</option>
+                {% endfor %}
+              </select>
+              {% elif magasin_reception_nom %}
+              <input type="text" class="form-control" value="{{ magasin_reception_nom }}" disabled>
+              <div class="form-text">Votre magasin de rattachement — non modifiable.</div>
               {% else %}
-              <option value="" disabled>Aucun fournisseur — ajoutez-en un d'abord</option>
-              {% endfor %}
-            </select>
-            <div class="form-text">
-              <a href="{{ url_for('pages_fournisseurs') }}">Gérer les fournisseurs</a>
+              <p class="text-danger small mb-0">Aucun magasin ne vous est rattaché : contactez un administrateur.</p>
+              {% endif %}
+            </div>
+
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Article</label>
+              {% set article_picker_id = 'entree-article-reception' %}
+              {% set article_picker_magasin_source_input = 'entree-reception-magasin'
+                 if current_user and current_user.role in ['Administrateur', 'Comptable'] else none %}
+              {% set article_picker_fournisseur_cible = 'entree-fournisseur-affichage' %}
+              {% include 'includes/article-picker.html' %}
             </div>
           </div>
 
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Magasin concerné par la réception</label>
-            {% if current_user and current_user.role in ['Administrateur', 'Comptable'] %}
-            <select class="form-select" name="magasin_id" id="entree-reception-magasin"
-                    data-type-toggle-champ required>
-              <option value="" selected disabled>Sélectionner un magasin</option>
-              {% for m in magasins %}
-              <option value="{{ m.id }}">{{ m.nom }}</option>
-              {% endfor %}
-            </select>
-            {% elif magasin_reception_nom %}
-            <input type="text" class="form-control" value="{{ magasin_reception_nom }}" disabled>
-            <div class="form-text">Votre magasin de rattachement — non modifiable.</div>
-            {% else %}
-            <p class="text-danger small mb-0">Aucun magasin ne vous est rattaché : contactez un administrateur.</p>
-            {% endif %}
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Article</label>
-            {% set article_picker_id = 'entree-article-reception' %}
-            {% set article_picker_magasin_source_input = 'entree-reception-magasin'
-               if current_user and current_user.role in ['Administrateur', 'Comptable'] else none %}
-            {% include 'includes/article-picker.html' %}
+          <div class="mb-2" id="entree-fournisseur-affichage">
+            <label class="form-label small fw-semibold">Fournisseur</label>
+            <input type="text" class="form-control" data-article-fournisseur-champ
+                   data-type-toggle-champ readonly required
+                   placeholder="Déterminé automatiquement une fois l'article choisi">
+            <div class="form-text text-danger" data-article-fournisseur-alerte hidden>
+              Cet article n'a pas de fournisseur rattaché : complétez d'abord sa fiche
+              (<a href="{{ url_for('pages_articles') }}">page Articles</a>) avant d'enregistrer une réception.
+            </div>
           </div>
 
           <div class="row">
@@ -145,16 +153,18 @@
 
         <!-- Retour client -->
         <div data-type-toggle-groupe="retour_client" hidden>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Article</label>
-            {% set article_picker_id = 'entree-article-retour' %}
-            {% set article_picker_magasin_source_input = none %}
-            {% include 'includes/article-picker.html' %}
-          </div>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Nom ou référence du client</label>
-            <input type="text" name="reference_client" class="form-control"
-                   placeholder="ex : Sté Dupont / CLI-0042" data-type-toggle-champ>
+          <div class="row">
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Article</label>
+              {% set article_picker_id = 'entree-article-retour' %}
+              {% set article_picker_magasin_source_input = none %}
+              {% include 'includes/article-picker.html' %}
+            </div>
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Nom ou référence du client</label>
+              <input type="text" name="reference_client" class="form-control"
+                     placeholder="ex : Sté Dupont / CLI-0042" data-type-toggle-champ>
+            </div>
           </div>
           <div class="mb-3">
             <label class="form-label small fw-semibold">Motif du retour (optionnel)</label>
@@ -164,22 +174,24 @@
 
         <!-- Régularisation -->
         <div data-type-toggle-groupe="regularisation" hidden>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Article</label>
-            {% set article_picker_id = 'entree-article-regularisation' %}
-            {% set article_picker_magasin_source_input = none %}
-            {% include 'includes/article-picker.html' %}
-          </div>
-          <div class="mb-2">
-            <label class="form-label small fw-semibold">Motif</label>
-            <select class="form-select" name="motif_regularisation" data-type-toggle-champ
-                    data-motif-regularisation="entree-motif-regul-autre-groupe">
-              <option value="" selected disabled>Sélectionner un motif</option>
-              <option value="Inventaire">Inventaire</option>
-              <option value="Casse/perte">Casse / perte</option>
-              <option value="Erreur de saisie">Erreur de saisie</option>
-              <option value="Autre">Autre</option>
-            </select>
+          <div class="row">
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Article</label>
+              {% set article_picker_id = 'entree-article-regularisation' %}
+              {% set article_picker_magasin_source_input = none %}
+              {% include 'includes/article-picker.html' %}
+            </div>
+            <div class="col-12 col-sm-6 mb-2">
+              <label class="form-label small fw-semibold">Motif</label>
+              <select class="form-select" name="motif_regularisation" data-type-toggle-champ
+                      data-motif-regularisation="entree-motif-regul-autre-groupe">
+                <option value="" selected disabled>Sélectionner un motif</option>
+                <option value="Inventaire">Inventaire</option>
+                <option value="Casse/perte">Casse / perte</option>
+                <option value="Erreur de saisie">Erreur de saisie</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
           </div>
           <div class="mb-3" id="entree-motif-regul-autre-groupe" hidden>
             <label class="form-label small fw-semibold">Précisez</label>
@@ -221,7 +233,12 @@
             {% endif %}
           </td>
           <td>{{ m.article }}</td>
-          <td>{{ m.detail }}</td>
+          <td>
+            {{ m.detail }}
+            {% if m.fournisseur %}
+            <div class="small text-muted">Fournisseur : {{ m.fournisseur }}</div>
+            {% endif %}
+          </td>
           <td>{{ m.quantite }}</td>
           <td>{{ m.saisi_par }}</td>
         </tr>
