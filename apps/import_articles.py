@@ -234,6 +234,6 @@ def modele_csv():
     return (
         "﻿"
         "nom,reference,seuil,fournisseur\n"
-        "Rame de papier A4,REF-0021,10,Papeterie Générale SARL\n"
+        "Riz parfumé 25 kg,REF-0001,10,Nom du fournisseur (déjà créé)\n"
         "Nouvel article exemple,REF-9001,5,\n"
     )
