@@ -274,8 +274,8 @@ RAPPROCHEMENT = []
 
 # ---------------------------------------------------------------------
 # Alertes (écarts de rapprochement + seuils critiques) : voir la classe
-# Alerte (apps/models.py) — stockées en base, alimentées par la
-# migration alertes (données de démonstration initiales).
+# Alerte (apps/models.py) — stockées en base, sans données de
+# démonstration (la page est vide tant qu'aucune alerte réelle n'existe).
 # ---------------------------------------------------------------------
 # Comptes utilisateurs (vue administrateur)
 #

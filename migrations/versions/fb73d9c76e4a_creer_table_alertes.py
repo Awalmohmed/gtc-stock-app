@@ -32,57 +32,10 @@ def upgrade():
     )
     # ### end Alembic commands ###
 
-    # --- Données initiales : les 4 alertes de démonstration qui vivaient
-    # jusqu'ici en dur dans apps/gtc_data.py (ALERTES), désormais en base.
-    # Chaque alerte est rattachée au magasin de l'article qu'elle cite
-    # (REF-0021/REF-0102 -> Magasin Principal, REF-0011 -> Magasin
-    # Secondaire — voir la migration c85378237d56).
-    conn = op.get_bind()
-    magasin_de_ref = {
-        row.reference: row.magasin_id
-        for row in conn.execute(sa.text(
-            "SELECT reference, magasin_id FROM articles "
-            "WHERE reference IN ('REF-0021', 'REF-0102', 'REF-0011')"
-        ))
-    }
-
-    alertes_table = sa.table(
-        'alertes',
-        sa.column('titre', sa.String), sa.column('detail', sa.String),
-        sa.column('date', sa.String), sa.column('type', sa.String),
-        sa.column('icone', sa.String), sa.column('traitee', sa.Boolean),
-        sa.column('magasin_id', sa.Integer),
-    )
-    op.bulk_insert(alertes_table, [
-        {
-            "titre": "Écart de rapprochement — Classeur A4",
-            "detail": "Quantité application : 8 — Quantité Sage 100 : 11 (écart de -3)",
-            "date": "24/08/2026 à 07:12", "type": "ecart",
-            "icone": "bi-shield-exclamation", "traitee": False,
-            "magasin_id": magasin_de_ref.get('REF-0102'),
-        },
-        {
-            "titre": "Écart de rapprochement — Stylo bille bleu (boîte)",
-            "detail": "Quantité application : 96 — Quantité Sage 100 : 90 (écart de +6)",
-            "date": "24/08/2026 à 07:12", "type": "ecart",
-            "icone": "bi-shield-exclamation", "traitee": False,
-            "magasin_id": magasin_de_ref.get('REF-0011'),
-        },
-        {
-            "titre": "Seuil critique atteint — Rame de papier A4",
-            "detail": "Quantité actuelle : 5 — Seuil d'alerte : 10",
-            "date": "22/08/2026 à 16:40", "type": "seuil",
-            "icone": "bi-exclamation-triangle", "traitee": True,
-            "magasin_id": magasin_de_ref.get('REF-0021'),
-        },
-        {
-            "titre": "Seuil critique atteint — Classeur A4",
-            "detail": "Quantité actuelle : 8 — Seuil d'alerte : 15",
-            "date": "21/08/2026 à 09:05", "type": "seuil",
-            "icone": "bi-exclamation-triangle", "traitee": False,
-            "magasin_id": magasin_de_ref.get('REF-0102'),
-        },
-    ])
+    # Pas de données initiales : les alertes de démonstration (Classeur A4,
+    # Stylo bille, Rame de papier A4…) ne correspondaient pas à l'activité
+    # de GTC sarl (denrées alimentaires) ; voir la migration e8a1c4d2b9f0
+    # qui les retire des bases déjà migrées.
 
 
 def downgrade():
