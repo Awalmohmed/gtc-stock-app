@@ -5,8 +5,9 @@
   de succès la session est créée et l'utilisateur est redirigé vers ?next=
   (validé par is_safe_next_url) ou le dashboard.
   Sections : illustration à gauche ; formulaire à droite (identifiant, mot de
-  passe avec bouton afficher/masquer, « Se souvenir de moi », lien mot de passe
-  oublié). Champ caché « next » propagé si présent. data-validate = confort client.
+  passe avec bouton afficher/masquer, « Se souvenir de moi »). Pas de lien « mot
+  de passe oublié » : seul un administrateur réinitialise un compte.
+  Champ caché « next » propagé si présent. data-validate = confort client.
 #}
 {% extends 'layouts/gtc-auth.html' %}
 
@@ -74,7 +75,6 @@
           <input class="form-check-input" type="checkbox" id="remember" name="remember">
           <label class="form-check-label small" for="remember">Se souvenir de moi</label>
         </div>
-        <a href="{{ url_for('accounts_forgot_password') }}" class="small text-decoration-none">Mot de passe oublié ?</a>
       </div>
       <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">Se connecter</button>
     </form>

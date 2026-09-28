@@ -956,14 +956,6 @@ def accounts_logout():
   flash("Vous avez été déconnecté.", "info")
   return redirect(url_for('accounts_sign_in'))
 
-@app.route('/accounts/forgot-password/')
-def accounts_forgot_password():
-  return render_template('accounts/forgot-password.html', segment='forgot_password', parent='accounts')
-
-@app.route('/accounts/reset-password/')
-def accounts_reset_password():
-  return render_template('accounts/reset-password.html', segment='reset_password', parent='accounts')
-
 @app.route('/accounts/lock/')
 def accounts_lock():
   return render_template('accounts/lock.html', segment='lock', parent='accounts')
