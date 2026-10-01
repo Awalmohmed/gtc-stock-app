@@ -290,14 +290,59 @@ RAPPROCHEMENT = []
 
 
 def get_stats():
-    """Chiffres agrégés pour les cartes du tableau de bord (limités au
-    magasin courant — voir _scope_magasin)."""
+    """Chiffres agrégés pour le tableau de bord (limités au magasin
+    courant — voir _scope_magasin) :
+      - les 4 compteurs déjà existants (total_articles, alertes,
+        dormants, ecarts) ;
+      - quantite_totale : somme des quantités en stock du périmètre —
+        l'article n'a pas de champ prix, donc "valeur du stock" se
+        mesure ici en unités, pas en montant ;
+      - mouvements_aujourdhui / mouvements_semaine : entrées + sorties
+        du périmètre, respectivement du jour même et depuis le lundi de
+        la semaine en cours (semaine ISO) ;
+      - top_ventes : les 3 articles les plus vendus sur les 30 derniers
+        jours, réutilisant la même logique que la page Analyse des
+        articles (voir get_analyse_articles)."""
     articles = _filtrer_articles(Article.query).all()
+    aujourdhui = date.today()
+    debut_semaine = aujourdhui - timedelta(days=aujourdhui.weekday())
+
+    entrees = _filtrer_articles(Entree.query.join(Article))
+    sorties = _filtrer_articles(Sortie.query.join(Article))
+    mouvements_aujourdhui = (
+        entrees.filter(Entree.date == aujourdhui).count()
+        + sorties.filter(Sortie.date == aujourdhui).count()
+    )
+    mouvements_semaine = (
+        entrees.filter(Entree.date >= debut_semaine).count()
+        + sorties.filter(Sortie.date >= debut_semaine).count()
+    )
+
+    top_ventes = get_analyse_articles("30")["top_ventes"][:3]
+    # largeur_barre : longueur de la mini-barre du top 3 du tableau de
+    # bord, relative au plus vendu des TROIS affichés (comparaison
+    # visuelle entre eux) — distinct de "pourcentage", qui reste la part
+    # sur l'ensemble des articles vendus (dénominateur plus large).
+    # Plancher à 4% : un article très en retrait derrière le premier
+    # (cas fréquent — un best-seller peut peser bien plus que les deux
+    # suivants réunis) reste visible comme barre plutôt que de
+    # disparaître à une largeur quasi nulle ; la valeur exacte reste de
+    # toute façon affichée en texte à côté.
+    max_quantite = top_ventes[0]["quantite_sortie"] if top_ventes else 0
+    for ligne in top_ventes:
+        ligne["largeur_barre"] = (
+            max(round(ligne["quantite_sortie"] / max_quantite * 100), 4) if max_quantite else 0
+        )
+
     return {
         "total_articles": len(articles),
         "alertes": sum(1 for a in articles if a.statut_classe == "alerte"),
         "dormants": sum(1 for a in articles if a.statut_classe == "dormant"),
         "ecarts": sum(1 for a in articles if a.ecart),
+        "quantite_totale": sum(a.quantite for a in articles),
+        "mouvements_aujourdhui": mouvements_aujourdhui,
+        "mouvements_semaine": mouvements_semaine,
+        "top_ventes": top_ventes,
     }
 
 
