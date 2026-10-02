@@ -488,9 +488,10 @@ class Alerte(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     titre = db.Column(db.String(255), nullable=False)
     detail = db.Column(db.String(255), nullable=False)
-    # Date d'affichage déjà formatée (pas encore de génération
-    # automatique horodatée pour ces alertes — voir le docstring de
-    # get_alertes dans apps/gtc_data.py).
+    # Date d'affichage déjà formatée ("JJ/MM/AAAA à HH:MM"). Les alertes
+    # "seuil" sont générées automatiquement quand une sortie, un bordereau
+    # de route ou un transfert fait basculer un article en alerte (voir
+    # apps/gtc_data.py, _ajouter_alerte_seuil).
     date = db.Column(db.String(50), nullable=False)
     # "ecart" (écart de rapprochement) ou "seuil" (seuil critique atteint).
     type = db.Column(db.String(20), nullable=False)

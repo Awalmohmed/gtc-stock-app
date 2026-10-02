@@ -511,6 +511,22 @@ def traiter_alerte(alerte_id, acteur=None):
     return alerte
 
 
+def _ajouter_alerte_seuil(article):
+    """Ajoute à la session (sans commit) l'alerte « Seuil critique
+    atteint » de la page Alertes pour `article`, qui vient de basculer en
+    alerte. Appelée aux mêmes endroits que mailer.envoyer_alerte_seuil
+    (add_sortie, add_bordereau_route, add_transfert), mais AVANT le
+    commit : l'alerte est enregistrée dans la même transaction que le
+    mouvement (tout ou rien), alors que l'e-mail part après."""
+    db.session.add(Alerte(
+        titre=f"Seuil critique atteint — {article.nom}",
+        detail=f"Quantité actuelle : {article.quantite} — Seuil d'alerte : {article.seuil}",
+        date=datetime.now().strftime("%d/%m/%Y à %H:%M"),
+        type="seuil", icone="bi-exclamation-triangle",
+        magasin_id=article.magasin_id,
+    ))
+
+
 def _mouvement_vers_dict(mouvement, type_libelle, signe):
     """Formate une ligne Entree/Sortie pour l'affichage (gabarit commun
     aux pages entrées/sorties et fiche de stock).
@@ -1142,6 +1158,8 @@ def add_sortie(article_id, date_mouvement, quantite, type_sortie, utilisateur, *
     bascule_en_alerte = statut_avant != "Alerte" and article.statut == "Alerte"
 
     db.session.add(sortie)
+    if bascule_en_alerte:
+        _ajouter_alerte_seuil(article)
     _journaliser(
         utilisateur, "sortie_stock",
         f"Sortie de {quantite} sur « {article.nom} » ({article.reference}) "
@@ -1263,6 +1281,7 @@ def add_bordereau_route(numero, date_expedition, magasin_expedition_id, destinat
         # transition vers l'alerte, pas à chaque sortie qui y reste.
         if statut_avant != "Alerte" and article.statut == "Alerte":
             articles_en_alerte.append(article)
+            _ajouter_alerte_seuil(article)
 
     _journaliser(
         utilisateur, "sortie_stock",
@@ -1375,6 +1394,8 @@ def transferer_stock(magasin_source_id, magasin_destination_id, article_id, quan
     # vers "Alerte", pas à chaque transfert tant qu'il y reste.
     bascule_en_alerte = statut_avant != "Alerte" and article_source.statut == "Alerte"
     db.session.add(sortie)
+    if bascule_en_alerte:
+        _ajouter_alerte_seuil(article_source)
 
     # --- Côté destination : crée l'article si besoin, comme une entrée ---
     if article_destination is None:
